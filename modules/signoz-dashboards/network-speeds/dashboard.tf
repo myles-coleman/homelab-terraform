@@ -366,12 +366,12 @@ resource "signoz_dashboard" "network_speeds" {
           ]
         }
       }
-      "internet-speed" = {
+      "download-history" = {
         kind = "Panel"
         spec = {
           display = {
-            name        = "Internet speed over time"
-            description = "speedtest download and upload bits per second"
+            name        = "Download speed over time"
+            description = "speedtest download bits per second"
           }
           links = []
           plugin = {
@@ -441,16 +441,61 @@ resource "signoz_dashboard" "network_speeds" {
                 }
               }
             },
+          ]
+        }
+      }
+      "upload-history" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Upload speed over time"
+            description = "speedtest upload bits per second"
+          }
+          links = []
+          plugin = {
+            time_series_panel = {
+              kind = "signoz/TimeSeriesPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                  fill_spans      = true
+                }
+                formatting = {
+                  unit              = "bps"
+                  decimal_precision = "2"
+                }
+                chart_appearance = {
+                  line_interpolation = "spline"
+                  show_points        = false
+                  line_style         = "solid"
+                  fill_mode          = "solid"
+                  span_gaps = {
+                    fill_only_below = false
+                    fill_less_than  = "0s"
+                  }
+                }
+                axes = {
+                  soft_min     = 0
+                  is_log_scale = false
+                }
+                legend = {
+                  position = "bottom"
+                  mode     = "list"
+                }
+              }
+            }
+          }
+          queries = [
             {
               kind = "time_series"
               spec = {
-                name = "B"
+                name = "A"
                 plugin = {
                   builder_query = {
                     kind = "signoz/BuilderQuery"
                     spec = {
                       metrics = {
-                        name          = "B"
+                        name          = "A"
                         step_interval = "60"
                         signal        = "metrics"
                         aggregations = [
@@ -712,7 +757,7 @@ resource "signoz_dashboard" "network_speeds" {
                 width  = 12
                 height = 6
                 content = {
-                  ref = "#/spec/panels/internet-speed"
+                  ref = "#/spec/panels/download-history"
                 }
               },
               {
@@ -721,12 +766,21 @@ resource "signoz_dashboard" "network_speeds" {
                 width  = 12
                 height = 6
                 content = {
-                  ref = "#/spec/panels/node-throughput"
+                  ref = "#/spec/panels/upload-history"
                 }
               },
               {
                 x      = 0
                 y      = 22
+                width  = 12
+                height = 6
+                content = {
+                  ref = "#/spec/panels/node-throughput"
+                }
+              },
+              {
+                x      = 0
+                y      = 28
                 width  = 12
                 height = 6
                 content = {

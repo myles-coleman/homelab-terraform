@@ -1,0 +1,55 @@
+name: Tailscale reachability diag
+
+on:
+  push:
+    branches:
+      - feat-signoz-dashboards
+  workflow_dispatch: {}
+
+jobs:
+  diag:
+    name: Diagnose Tailscale subnet routing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tailscale
+        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Accept Tailscale routes
+        run: sudo tailscale set --accept-routes
+
+      - name: Prefs and status
+        run: |
+          echo "=== debug prefs (RouteAll / ExitNode / CorpDNS) ==="
+          tailscale debug prefs 2>/dev/null | grep -iE 'RouteAll|ExitNode|CorpDNS|WantRunning' || true
+          echo "=== tailscale status ==="
+          tailscale status || true
+          echo "=== tailscale status --json (routes) ==="
+          tailscale status --json 2>/dev/null | jq -r '.Peer[] | "\(.HostName) primary_routes=\(.PrimaryRoutes) allowed=\(.AllowedIPs)"' 2>/dev/null || true
+          echo "=== ip route ==="
+          ip route || true
+          echo "=== ip route get 10.0.0.200 / 10.0.0.99 ==="
+          ip route get 10.0.0.200 || true
+          ip route get 10.0.0.99 || true
+
+      - name: Reachability before DNS override
+        run: |
+          echo "--- 10.0.0.200:6443 (kube-vip API) ---"; nc -vz -w5 10.0.0.200 6443 || true
+          echo "--- 10.0.0.99:443 (MetalLB/Traefik) ---"; nc -vz -w5 10.0.0.99 443 || true
+          echo "--- https 10.0.0.200:6443/version ---"; curl -sk -o /dev/null -w 'http=%{http_code} time=%{time_total}\n' --max-time 10 https://10.0.0.200:6443/version || true
+
+      - name: Fix DNS resolution
+        run: |
+          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
+          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+
+      - name: Reachability after DNS override
+        run: |
+          echo "=== resolv.conf ==="; cat /etc/resolv.conf
+          echo "=== getent signoz.cowlab.org ==="; getent hosts signoz.cowlab.org || true
+          echo "--- 10.0.0.200:6443 ---"; nc -vz -w5 10.0.0.200 6443 || true
+          echo "--- 10.0.0.99:443 ---"; nc -vz -w5 10.0.0.99 443 || true
+          echo "=== ip route after DNS ==="; ip route || true

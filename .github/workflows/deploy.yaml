@@ -82,7 +82,11 @@ jobs:
           echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
           echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
 
+      # Only the argocd-* modules use a kubeconfig-based provider. cloudflare,
+      # s3-backups and signoz-dashboards do not, so they should not depend on
+      # the KUBECONFIG secret.
       - name: Setup kubeconfig
+        if: startsWith(matrix.module, 'argocd-')
         run: |
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config

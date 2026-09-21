@@ -105,15 +105,15 @@ jobs:
         env:
           TF_IN_AUTOMATION: true
         run: |
-          terragrunt plan -out=tfplan-${{ matrix.module }}.tfplan
-          terragrunt show -json tfplan-${{ matrix.module }}.tfplan > tfplan-${{ matrix.module }}.json
+          terragrunt plan -out=tfplan.tfplan
+          terragrunt show -json tfplan.tfplan > tfplan.json
         working-directory: ./modules/${{ matrix.module }}
 
       - name: Comment Plan Changes
         if: github.event_name == 'pull_request'
         uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
         with:
-          json-file: ./modules/${{ matrix.module }}/tfplan-${{ matrix.module }}.json
+          json-file: ./modules/${{ matrix.module }}/tfplan.json
           comment-header: "Terraform Plan for ${{ matrix.module }}"
           expand-comment: 'true'
           hide-previous-comments: 'true'

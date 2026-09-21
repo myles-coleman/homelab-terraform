@@ -5,12 +5,14 @@ on:
     paths:
       - "modules/**"
       - "scripts/**"
+      - ".github/workflows/**"
   push:
     branches:
       - main
     paths:
       - "modules/**"
       - "scripts/**"
+      - ".github/workflows/**"
   workflow_dispatch: {}
 
 concurrency:

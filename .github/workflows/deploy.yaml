@@ -41,7 +41,7 @@ jobs:
           - cloudflare
           - s3-backups
           - signoz-dashboards/homelab-overview
-          - signoz-dashboards/kubernetes-nodes
+          - signoz-dashboards/network-speeds
           - signoz-dashboards/pi5-thermal
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

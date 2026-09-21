@@ -3,7 +3,7 @@ terraform {
   backend "s3" {
     bucket       = "myles-homelab-tfstate"
     encrypt      = true
-    key          = "modules/signoz-dashboards/kubernetes-nodes/terraform.tfstate"
+    key          = "modules/signoz-dashboards/network-speeds/terraform.tfstate"
     region       = "us-west-1"
     use_lockfile = true
   }

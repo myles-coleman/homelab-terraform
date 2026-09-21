@@ -1,21 +1,21 @@
-# Kubernetes & Nodes dashboard (SigNoz v2 / Perses schema v6).
+# Network Speeds dashboard (SigNoz v2 / Perses schema v6).
 #
-# Managed by Terragrunt. State is isolated per dashboard unit so a broken panel
-# here cannot block the other dashboards. Metric names come from the verified
-# inventory (see spec 01-spec-signoz-homelab-dashboards.md).
+# Managed by Terragrunt. Internet speed tests come from the speedtest exporter
+# (homelab-cluster/manifests/cluster/speedtest); node and pod throughput come
+# from the k8s-infra hostMetrics / kubeletstats presets.
 
-resource "signoz_dashboard" "kubernetes_nodes" {
+resource "signoz_dashboard" "network_speeds" {
   schema_version = "v6"
-  name           = "kubernetes-nodes"
+  name           = "network-speeds"
   tags = [
     { key = "tag", value = "homelab" },
-    { key = "tag", value = "kubernetes" },
+    { key = "tag", value = "network" },
   ]
 
   spec = {
     display = {
-      name        = "Kubernetes & Nodes"
-      description = "Node and workload health: node CPU/memory/filesystem, pod CPU/memory by namespace, deployment availability and container restarts."
+      name        = "Network Speeds"
+      description = "Internet speed tests (download/upload/latency/jitter/packet loss) plus per-node and per-namespace network throughput."
     }
     links = []
 
@@ -25,18 +25,18 @@ resource "signoz_dashboard" "kubernetes_nodes" {
           kind = "ListVariable"
           spec = {
             display = {
-              name        = "k8s_node_name"
-              description = "Kubernetes node"
+              name        = "host_name"
+              description = "Host sending network metrics"
             }
             allow_all_value = true
             allow_multiple  = true
             sort            = "alphabetical-asc"
-            name            = "k8s_node_name"
+            name            = "host_name"
             plugin = {
               dynamic_variable = {
                 kind = "signoz/DynamicVariable"
                 spec = {
-                  name   = "k8s.node.name"
+                  name   = "host.name"
                   signal = "metrics"
                 }
               }
@@ -67,526 +67,16 @@ resource "signoz_dashboard" "kubernetes_nodes" {
             }
           }
         }
-      }
+      },
     ]
 
     panels = {
-      "node-cpu" = {
+      "download" = {
         kind = "Panel"
         spec = {
           display = {
-            name        = "Node CPU usage"
-            description = "k8s.node.cpu.usage per node"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "short"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.node.cpu.usage"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.node.name IN $k8s_node_name"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.node.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.node.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "node-memory" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Node memory usage"
-            description = "k8s.node.memory.usage per node"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "bytes"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.node.memory.usage"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.node.name IN $k8s_node_name"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.node.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.node.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "node-filesystem" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Node filesystem usage"
-            description = "k8s.node.filesystem.usage per node"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "bytes"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.node.filesystem.usage"
-                            time_aggregation  = "avg"
-                            space_aggregation = "sum"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.node.name IN $k8s_node_name"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.node.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.node.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "pod-cpu" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Pod CPU usage"
-            description = "k8s.pod.cpu.usage grouped by namespace"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "short"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.cpu.usage"
-                            time_aggregation  = "avg"
-                            space_aggregation = "sum"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name IN $namespace"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.namespace.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.namespace.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "pod-memory" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Pod working set"
-            description = "k8s.pod.memory.working_set grouped by namespace"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "bytes"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.memory.working_set"
-                            time_aggregation  = "avg"
-                            space_aggregation = "sum"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name IN $namespace"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.namespace.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.namespace.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "deployment-available" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Deployments available"
-            description = "k8s.deployment.available grouped by namespace"
-          }
-          links = []
-          plugin = {
-            time_series_panel = {
-              kind = "signoz/TimeSeriesPanel"
-              spec = {
-                visualization = {
-                  time_preference = "global_time"
-                  fill_spans      = true
-                }
-                formatting = {
-                  unit              = "short"
-                  decimal_precision = "2"
-                }
-                chart_appearance = {
-                  line_interpolation = "spline"
-                  show_points        = false
-                  line_style         = "solid"
-                  fill_mode          = "solid"
-                  span_gaps = {
-                    fill_only_below = false
-                    fill_less_than  = "0s"
-                  }
-                }
-                axes = {
-                  soft_min     = 0
-                  is_log_scale = false
-                }
-                legend = {
-                  position = "bottom"
-                  mode     = "list"
-                }
-              }
-            }
-          }
-          queries = [
-            {
-              kind = "time_series"
-              spec = {
-                name = "A"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.deployment.available"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                            reduce_to         = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name IN $namespace"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.namespace.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "{{k8s.namespace.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-          ]
-        }
-      }
-      "container-restarts" = {
-        kind = "Panel"
-        spec = {
-          display = {
-            name        = "Container restarts"
-            description = "k8s.container.restarts (max, last value)"
+            name        = "Download speed"
+            description = "speedtest_download_bits_per_second (latest)"
           }
           links = []
           plugin = {
@@ -595,10 +85,9 @@ resource "signoz_dashboard" "kubernetes_nodes" {
               spec = {
                 visualization = {
                   time_preference = "global_time"
-
                 }
                 formatting = {
-                  unit              = "short"
+                  unit              = "bps"
                   decimal_precision = "2"
                 }
               }
@@ -619,19 +108,536 @@ resource "signoz_dashboard" "kubernetes_nodes" {
                         signal        = "metrics"
                         aggregations = [
                           {
-                            metric_name       = "k8s.container.restarts"
-                            time_aggregation  = "max"
-                            space_aggregation = "max"
+                            metric_name       = "speedtest_download_bits_per_second"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
                             reduce_to         = "last"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Download"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "upload" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Upload speed"
+            description = "speedtest_upload_bits_per_second (latest)"
+          }
+          links = []
+          plugin = {
+            number_panel = {
+              kind = "signoz/NumberPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                }
+                formatting = {
+                  unit              = "bps"
+                  decimal_precision = "2"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "scalar"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_upload_bits_per_second"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "last"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Upload"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "ping" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Ping latency"
+            description = "speedtest_ping_latency_milliseconds (latest)"
+          }
+          links = []
+          plugin = {
+            number_panel = {
+              kind = "signoz/NumberPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                }
+                formatting = {
+                  unit              = "ms"
+                  decimal_precision = "2"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "scalar"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_ping_latency_milliseconds"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "last"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Ping"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "jitter" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Jitter"
+            description = "speedtest_jitter_latency_milliseconds (latest)"
+          }
+          links = []
+          plugin = {
+            number_panel = {
+              kind = "signoz/NumberPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                }
+                formatting = {
+                  unit              = "ms"
+                  decimal_precision = "2"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "scalar"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_jitter_latency_milliseconds"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "last"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Jitter"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "packet-loss" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Packet loss"
+            description = "speedtest_packet_loss_percent (latest)"
+          }
+          links = []
+          plugin = {
+            number_panel = {
+              kind = "signoz/NumberPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                }
+                formatting = {
+                  unit              = "percent"
+                  decimal_precision = "2"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "scalar"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_packet_loss_percent"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "last"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Packet loss"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "internet-speed" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Internet speed over time"
+            description = "speedtest download and upload bits per second"
+          }
+          links = []
+          plugin = {
+            time_series_panel = {
+              kind = "signoz/TimeSeriesPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                  fill_spans      = true
+                }
+                formatting = {
+                  unit              = "bps"
+                  decimal_precision = "2"
+                }
+                chart_appearance = {
+                  line_interpolation = "spline"
+                  show_points        = false
+                  line_style         = "solid"
+                  fill_mode          = "solid"
+                  span_gaps = {
+                    fill_only_below = false
+                    fill_less_than  = "0s"
+                  }
+                }
+                axes = {
+                  soft_min     = 0
+                  is_log_scale = false
+                }
+                legend = {
+                  position = "bottom"
+                  mode     = "list"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "time_series"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_download_bits_per_second"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "avg"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Download"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              kind = "time_series"
+              spec = {
+                name = "B"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "B"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "speedtest_upload_bits_per_second"
+                            time_aggregation  = "latest"
+                            space_aggregation = "avg"
+                            reduce_to         = "avg"
+                          },
+                        ]
+                        filter = {
+                          expression = ""
+                        }
+                        having = {
+                          expression = ""
+                        }
+                        legend = "Upload"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "node-throughput" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Node network throughput"
+            description = "system.network.io rate per host and direction"
+          }
+          links = []
+          plugin = {
+            time_series_panel = {
+              kind = "signoz/TimeSeriesPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                  fill_spans      = true
+                }
+                formatting = {
+                  unit              = "Bps"
+                  decimal_precision = "2"
+                }
+                chart_appearance = {
+                  line_interpolation = "spline"
+                  show_points        = false
+                  line_style         = "solid"
+                  fill_mode          = "solid"
+                  span_gaps = {
+                    fill_only_below = false
+                    fill_less_than  = "0s"
+                  }
+                }
+                axes = {
+                  soft_min     = 0
+                  is_log_scale = false
+                }
+                legend = {
+                  position = "bottom"
+                  mode     = "list"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "time_series"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "system.network.io"
+                            time_aggregation  = "rate"
+                            space_aggregation = "sum"
+                            reduce_to         = "sum"
+                          },
+                        ]
+                        filter = {
+                          expression = "host.name IN $host_name"
+                        }
+                        group_by = [
+                          {
+                            name            = "host.name"
+                            field_context   = "attribute"
+                            field_data_type = "string"
+                          },
+                        ]
+                        having = {
+                          expression = ""
+                        }
+                        legend = "{{host.name}} {{direction}}"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+          ]
+        }
+      }
+      "pod-throughput" = {
+        kind = "Panel"
+        spec = {
+          display = {
+            name        = "Pod network throughput"
+            description = "k8s.pod.network.io rate by namespace"
+          }
+          links = []
+          plugin = {
+            time_series_panel = {
+              kind = "signoz/TimeSeriesPanel"
+              spec = {
+                visualization = {
+                  time_preference = "global_time"
+                  fill_spans      = true
+                }
+                formatting = {
+                  unit              = "Bps"
+                  decimal_precision = "2"
+                }
+                chart_appearance = {
+                  line_interpolation = "spline"
+                  show_points        = false
+                  line_style         = "solid"
+                  fill_mode          = "solid"
+                  span_gaps = {
+                    fill_only_below = false
+                    fill_less_than  = "0s"
+                  }
+                }
+                axes = {
+                  soft_min     = 0
+                  is_log_scale = false
+                }
+                legend = {
+                  position = "bottom"
+                  mode     = "list"
+                }
+              }
+            }
+          }
+          queries = [
+            {
+              kind = "time_series"
+              spec = {
+                name = "A"
+                plugin = {
+                  builder_query = {
+                    kind = "signoz/BuilderQuery"
+                    spec = {
+                      metrics = {
+                        name          = "A"
+                        step_interval = "60"
+                        signal        = "metrics"
+                        aggregations = [
+                          {
+                            metric_name       = "k8s.pod.network.io"
+                            time_aggregation  = "rate"
+                            space_aggregation = "sum"
+                            reduce_to         = "sum"
                           },
                         ]
                         filter = {
                           expression = "k8s.namespace.name IN $namespace"
                         }
+                        group_by = [
+                          {
+                            name            = "k8s.namespace.name"
+                            field_context   = "attribute"
+                            field_data_type = "string"
+                          },
+                        ]
                         having = {
                           expression = ""
                         }
-                        legend = "Restarts"
+                        legend = "{{k8s.namespace.name}}"
                       }
                     }
                   }
@@ -658,64 +664,73 @@ resource "signoz_dashboard" "kubernetes_nodes" {
               {
                 x      = 0
                 y      = 0
-                width  = 6
-                height = 6
+                width  = 4
+                height = 5
                 content = {
-                  ref = "#/spec/panels/node-cpu"
+                  ref = "#/spec/panels/download"
                 }
               },
               {
-                x      = 6
+                x      = 4
                 y      = 0
-                width  = 6
-                height = 6
+                width  = 4
+                height = 5
                 content = {
-                  ref = "#/spec/panels/node-memory"
+                  ref = "#/spec/panels/upload"
+                }
+              },
+              {
+                x      = 8
+                y      = 0
+                width  = 4
+                height = 5
+                content = {
+                  ref = "#/spec/panels/ping"
                 }
               },
               {
                 x      = 0
-                y      = 6
-                width  = 6
-                height = 6
+                y      = 5
+                width  = 4
+                height = 5
                 content = {
-                  ref = "#/spec/panels/node-filesystem"
+                  ref = "#/spec/panels/jitter"
                 }
               },
               {
-                x      = 6
-                y      = 6
-                width  = 6
-                height = 6
+                x      = 4
+                y      = 5
+                width  = 4
+                height = 5
                 content = {
-                  ref = "#/spec/panels/pod-cpu"
-                }
-              },
-              {
-                x      = 0
-                y      = 12
-                width  = 6
-                height = 6
-                content = {
-                  ref = "#/spec/panels/pod-memory"
-                }
-              },
-              {
-                x      = 6
-                y      = 12
-                width  = 6
-                height = 6
-                content = {
-                  ref = "#/spec/panels/deployment-available"
+                  ref = "#/spec/panels/packet-loss"
                 }
               },
               {
                 x      = 0
-                y      = 18
-                width  = 6
+                y      = 10
+                width  = 12
                 height = 6
                 content = {
-                  ref = "#/spec/panels/container-restarts"
+                  ref = "#/spec/panels/internet-speed"
+                }
+              },
+              {
+                x      = 0
+                y      = 16
+                width  = 12
+                height = 6
+                content = {
+                  ref = "#/spec/panels/node-throughput"
+                }
+              },
+              {
+                x      = 0
+                y      = 22
+                width  = 12
+                height = 6
+                content = {
+                  ref = "#/spec/panels/pod-throughput"
                 }
               },
             ]

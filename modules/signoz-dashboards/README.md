@@ -12,7 +12,7 @@ dashboard cannot block the others:
 | Unit | Dashboard |
 | --- | --- |
 | `homelab-overview/` | Homelab Overview — cluster/node triage surface |
-| `kubernetes-nodes/` | Kubernetes & Nodes — node and workload drill-down |
+| `network-speeds/` | Network Speeds — internet speed tests + node/pod throughput |
 | `pi5-thermal/` | Pi 5 Thermal — per-node temperature, CPU frequency, load |
 
 ## Configuration

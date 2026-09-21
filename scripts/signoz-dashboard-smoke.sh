@@ -24,7 +24,7 @@ start_ms="$(( end_ms - 3600000 ))"
 # "<dashboard-name>:<principal-metric>"
 dashboards=(
   "homelab-overview:k8s.node.cpu.usage"
-  "kubernetes-nodes:k8s.node.memory.usage"
+  "network-speeds:speedtest_download_bits_per_second"
   "pi5-thermal:node_thermal_zone_temp"
 )
 

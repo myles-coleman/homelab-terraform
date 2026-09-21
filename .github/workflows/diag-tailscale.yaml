@@ -1,0 +1,39 @@
+name: Tailscale reachability diag
+
+on:
+  push:
+    branches:
+      - feat-signoz-dashboards
+  workflow_dispatch: {}
+
+jobs:
+  diag:
+    name: Diagnose subnet route from runner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tailscale
+        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Accept Tailscale routes
+        run: sudo tailscale set --accept-routes
+
+      - name: Route table and peer routes
+        run: |
+          echo "=== RouteAll ==="; tailscale debug prefs 2>/dev/null | grep -iE 'RouteAll' || true
+          echo "=== protecli-vault routes ==="
+          tailscale status --json 2>/dev/null | jq -r '.Peer[] | select(.HostName=="protecli-vault") | "primaryRoutes=\(.PrimaryRoutes) allowed=\(.AllowedIPs) exitNodeOption=\(.ExitNodeOption)"' || true
+          echo "=== ip route (10.0.0.0/24?) ==="; ip route | grep -E '10\.0\.0\.|tailscale0|default' || true
+          echo "=== ip route get 10.0.0.200 ==="; ip route get 10.0.0.200 || true
+          echo "=== ip route get 10.0.0.99 ==="; ip route get 10.0.0.99 || true
+
+      - name: Connectivity matrix
+        run: |
+          echo "--- tailscale ping protecli-vault ---"; tailscale ping -c 2 --timeout 5s protecli-vault || true
+          echo "--- nc 10.0.0.200 6443 (kube-vip API) ---"; nc -vz -w6 10.0.0.200 6443 || true
+          echo "--- nc 10.0.0.99 443 (MetalLB) ---"; nc -vz -w6 10.0.0.99 443 || true
+          echo "--- nc 10.0.0.140 6443 (node0) ---"; nc -vz -w6 10.0.0.140 6443 || true
+          echo "--- curl 10.0.0.200/version ---"; curl -sk -o /dev/null -w 'http=%{http_code} time=%{time_total}\n' --max-time 10 https://10.0.0.200:6443/version || true

@@ -14,7 +14,10 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
     "sts.amazonaws.com"
   ]
 
-  thumbprint_list = ["cf23df2207d99a74fbe169e3eba035e633b65d94"]
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+  ]
 
   tags = {
     ManagedBy = "Terraform"
@@ -35,7 +38,16 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:myles-coleman/homelab-terraform:*"]
+      values = [
+        # homelab-terraform was created after 2026-07-15, so GitHub issues an
+        # immutable subject claim that includes the owner and repository IDs:
+        #   repo:OWNER@OWNER-ID/REPO@REPO-ID:*
+        "repo:myles-coleman@44505855/homelab-terraform@1329076037:*",
+        # homelab-cluster predates 2026-07-15 and uses the classic subject
+        # format. Keep it trusted until the migration off homelab-cluster is
+        # complete, then remove this line.
+        "repo:myles-coleman/homelab-cluster:*",
+      ]
     }
 
     condition {

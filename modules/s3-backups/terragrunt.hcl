@@ -8,9 +8,9 @@ locals {
 
 inputs = {
   cluster_name = local.common_inputs.cluster_name
-  bucket_name = "myles-homelab-backups"
-  environment = local.common_inputs.environment
-  aws_region = local.common_inputs.aws_region
+  bucket_name  = "myles-homelab-backups"
+  environment  = local.common_inputs.environment
+  aws_region   = local.common_inputs.aws_region
 }
 
 generate "provider" {

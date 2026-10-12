@@ -66,23 +66,38 @@ jobs:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
 
+      # The action already passes --accept-routes to `tailscale up`, so the
+      # separate `tailscale set` step it used to need is gone. --accept-dns=false
+      # keeps tailscaled out of DNS entirely: nothing here needs MagicDNS, since
+      # the kubeconfig dials the kube-vip IP 10.0.0.200:6443 and every other name
+      # is public *.cowlab.org resolved over the route.
       - name: Tailscale
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          args: "--accept-dns=false"
 
-      - name: Accept Tailscale routes
-        run: sudo tailscale set --accept-routes
-
-      # Accepting Tailscale routes breaks DNS resolution (systemd-resolved at
-      # 127.0.0.53 times out). Override with Google public DNS to restore
-      # connectivity to AWS and other external services.
+      # Accepting Tailscale routes breaks systemd-resolved, whose 127.0.0.53 stub
+      # then times out. Writing Google DNS into /etc/resolv.conf is not enough:
+      # systemd-resolved owns that path on these runners and rewrites it within
+      # seconds, so short jobs passed while the four-minute apply job failed
+      # every AWS call with "lookup sts.us-west-1.amazonaws.com on 127.0.0.53:53:
+      # i/o timeout". Drop the stub resolver, install a plain file nothing can
+      # revert, then fail fast instead of burning minutes in provider retries.
       - name: Fix DNS resolution
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
-          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+          sudo systemctl disable --now systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 8.8.8.8\nnameserver 8.8.4.4\n' | sudo tee /etc/resolv.conf > /dev/null
+          for attempt in 1 2 3 4 5; do
+            getent hosts "sts.${AWS_REGION}.amazonaws.com" && break
+            echo "DNS not ready (attempt ${attempt}/5); retrying in 3s"
+            sleep 3
+          done
+          getent hosts "sts.${AWS_REGION}.amazonaws.com"
+          [ -z "${SIGNOZ_ENDPOINT:-}" ] || getent hosts "${SIGNOZ_ENDPOINT#https://}"
 
       # Only the argocd-* modules use a kubeconfig-based provider. cloudflare,
       # s3-backups and signoz-dashboards do not, so they should not depend on
@@ -153,23 +168,38 @@ jobs:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
 
+      # The action already passes --accept-routes to `tailscale up`, so the
+      # separate `tailscale set` step it used to need is gone. --accept-dns=false
+      # keeps tailscaled out of DNS entirely: nothing here needs MagicDNS, since
+      # the kubeconfig dials the kube-vip IP 10.0.0.200:6443 and every other name
+      # is public *.cowlab.org resolved over the route.
       - name: Tailscale
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          args: "--accept-dns=false"
 
-      - name: Accept Tailscale routes
-        run: sudo tailscale set --accept-routes
-
-      # Accepting Tailscale routes breaks DNS resolution (systemd-resolved at
-      # 127.0.0.53 times out). Override with Google public DNS to restore
-      # connectivity to AWS and other external services.
+      # Accepting Tailscale routes breaks systemd-resolved, whose 127.0.0.53 stub
+      # then times out. Writing Google DNS into /etc/resolv.conf is not enough:
+      # systemd-resolved owns that path on these runners and rewrites it within
+      # seconds, so short jobs passed while the four-minute apply job failed
+      # every AWS call with "lookup sts.us-west-1.amazonaws.com on 127.0.0.53:53:
+      # i/o timeout". Drop the stub resolver, install a plain file nothing can
+      # revert, then fail fast instead of burning minutes in provider retries.
       - name: Fix DNS resolution
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
-          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+          sudo systemctl disable --now systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 8.8.8.8\nnameserver 8.8.4.4\n' | sudo tee /etc/resolv.conf > /dev/null
+          for attempt in 1 2 3 4 5; do
+            getent hosts "sts.${AWS_REGION}.amazonaws.com" && break
+            echo "DNS not ready (attempt ${attempt}/5); retrying in 3s"
+            sleep 3
+          done
+          getent hosts "sts.${AWS_REGION}.amazonaws.com"
+          [ -z "${SIGNOZ_ENDPOINT:-}" ] || getent hosts "${SIGNOZ_ENDPOINT#https://}"
 
       - name: Setup kubeconfig
         run: |
@@ -181,6 +211,14 @@ jobs:
 
       - name: Terragrunt Validate
         run: terragrunt validate -all
+
+      # The apply step runs for minutes, which is exactly the window in which the
+      # old fix was silently reverted. Re-assert DNS here so a reverted resolver
+      # fails in seconds with an obvious message instead of a provider retry storm.
+      - name: Verify DNS still resolves
+        run: |
+          getent hosts "sts.${AWS_REGION}.amazonaws.com"
+          [ -z "${SIGNOZ_ENDPOINT:-}" ] || getent hosts "${SIGNOZ_ENDPOINT#https://}"
 
       - name: Terragrunt Apply
         uses: gruntwork-io/terragrunt-action@95fc057922e3c3d4cc021a81a213f088f333ddef # v3.0.2
@@ -204,24 +242,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
+      # Same Tailscale and DNS setup as the plan/apply jobs; see the comments
+      # there for why --accept-dns=false and the replaced /etc/resolv.conf matter.
+      # The wildcard *.cowlab.org record still resolves to the MetalLB IP, which
+      # is routed over Tailscale.
       - name: Tailscale
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          args: "--accept-dns=false"
 
-      - name: Accept Tailscale routes
-        run: sudo tailscale set --accept-routes
-
-      # Accepting Tailscale routes breaks DNS resolution (systemd-resolved at
-      # 127.0.0.53 times out). Override with Google public DNS to restore
-      # connectivity; the wildcard *.cowlab.org record still resolves to the
-      # MetalLB IP, which is routed over Tailscale.
       - name: Fix DNS resolution
         run: |
-          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
-          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+          sudo systemctl disable --now systemd-resolved 2>/dev/null || true
+          sudo rm -f /etc/resolv.conf
+          printf 'nameserver 8.8.8.8\nnameserver 8.8.4.4\n' | sudo tee /etc/resolv.conf > /dev/null
+          for attempt in 1 2 3 4 5; do
+            getent hosts "sts.${AWS_REGION}.amazonaws.com" && break
+            echo "DNS not ready (attempt ${attempt}/5); retrying in 3s"
+            sleep 3
+          done
+          getent hosts "sts.${AWS_REGION}.amazonaws.com"
+          [ -z "${SIGNOZ_ENDPOINT:-}" ] || getent hosts "${SIGNOZ_ENDPOINT#https://}"
 
       - name: Run dashboard smoke query
         run: ./scripts/signoz-dashboard-smoke.sh

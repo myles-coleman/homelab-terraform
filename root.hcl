@@ -7,10 +7,10 @@ remote_state {
     if_exists = "overwrite_terragrunt"
   }
   config = {
-    bucket         = "myles-homelab-tfstate"
-    key            = "${path_relative_to_include()}/terraform.tfstate"
-    region         = "us-west-1"
-    encrypt        = true
-    use_lockfile   = true
+    bucket       = "myles-homelab-tfstate"
+    key          = "${path_relative_to_include()}/terraform.tfstate"
+    region       = "us-west-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }

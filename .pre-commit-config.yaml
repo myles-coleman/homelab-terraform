@@ -1,0 +1,30 @@
+# Local pre-commit hooks for homelab-terraform.
+#
+# Deliberately narrow: offline formatting and hygiene checks that are safe to run
+# on every commit. Validation, planning, and applying stay in CI
+# (.github/workflows/deploy.yaml), which needs the kubeconfig, the Tailscale
+# route, and cloud credentials that a git hook should never hold.
+#
+# Hook revs are pinned to release tags; bump them with `pre-commit autoupdate`.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.109.2
+    hooks:
+      # root.hcl sets terraform_binary = "tofu" and CI runs `tofu fmt`, but this
+      # hook otherwise prefers a `terraform` binary when both are installed.
+      - id: terraform_fmt
+        args: [--hook-config=--tf-path=tofu]
+      # Runs `terragrunt hcl format` on Terragrunt >= 0.78 (CI pins 0.97.x) and
+      # falls back to `hclfmt` on older releases.
+      - id: terragrunt_fmt

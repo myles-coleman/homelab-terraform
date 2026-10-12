@@ -7,8 +7,8 @@ locals {
 }
 
 inputs = {
-  argocd_host = local.common_inputs.argocd_host
-  dex_url    = "https://dex.cowlab.org/dex"
+  argocd_host     = local.common_inputs.argocd_host
+  dex_url         = "https://dex.cowlab.org/dex"
   github_username = "myles-coleman"
 }
 

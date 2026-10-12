@@ -11,7 +11,7 @@ inputs = {
 }
 
 dependency "argocd_install" {
-  config_path = "${get_repo_root()}/modules/argocd-install"
+  config_path  = "${get_repo_root()}/modules/argocd-install"
   skip_outputs = true
 }
 

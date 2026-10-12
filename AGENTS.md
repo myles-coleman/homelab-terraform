@@ -1,0 +1,120 @@
+# AGENTS.md
+
+Guidance for AI coding agents working in `homelab-terraform` — the Terragrunt + OpenTofu
+root that manages homelab infrastructure for `cowlab.org`.
+
+## Layout
+
+```
+root.hcl                       # shared Terragrunt root: OpenTofu binary + S3 remote state
+common-inputs.yaml             # shared inputs read by every unit
+bootstrap/                     # plain Terraform, not Terragrunt: S3 state bucket + GitHub OIDC role
+modules/terragrunt.hcl         # include-only stub; every unit reaches root.hcl through it
+modules/cloudflare/            # DNS records, zone, tunnel, Access
+modules/argocd-install/        # ArgoCD Helm install
+modules/argocd-configure/      # ArgoCD bootstrap configuration
+modules/s3-backups/            # backup bucket + lifecycle policy
+modules/signoz-dashboards/     # declarative SigNoz dashboards (has its own README)
+scripts/                       # signoz-dashboard-smoke.sh
+.github/workflows/deploy.yaml  # the only CI entry point
+```
+
+Each directory under `modules/` is its own unit with its own state key
+(`${path_relative_to_include()}/terraform.tfstate`), so units apply independently and one
+bad unit does not block the rest.
+
+`bootstrap/` is applied by hand, once, before any unit — it creates the state bucket and the
+GitHub Actions OIDC role that everything else assumes. CI deliberately never touches it.
+
+## Commands
+
+<!-- generated:begin id=commands -->
+Toolchain: OpenTofu 1.11.x and Terragrunt 0.97.x, as pinned in .github/workflows/deploy.yaml.
+
+- Validate a unit: `cd modules/<unit> && terragrunt validate`
+- Plan a unit: `cd modules/<unit> && terragrunt plan -out=tfplan.tfplan`
+- Show a saved plan: `cd modules/<unit> && terragrunt show -json tfplan.tfplan`
+- Apply a unit: `cd modules/<unit> && terragrunt apply`
+- Validate every unit: `terragrunt validate -all`
+- Apply every unit: `terragrunt apply --all --non-interactive`
+- Check OpenTofu formatting: `tofu fmt -check -recursive`
+- Check HCL formatting: `terragrunt hcl format --check`
+- Validate with no AWS credentials: `terragrunt init -backend=false && tofu init -backend=false && tofu validate`
+- Post-deploy telemetry check: `./scripts/signoz-dashboard-smoke.sh`
+- Install the git hooks: `pre-commit install`
+- Run every git hook: `pre-commit run --all-files`
+<!-- generated:end id=commands -->
+
+Unit-scoped commands run from that unit's directory; the `--all` forms run from the
+repository root. `modules/signoz-dashboards/README.md` and
+`scripts/signoz-dashboard-smoke.sh` document the fuller sequences and the environment
+variables they need.
+
+## Domain Glossary
+
+- **unit** — a directory with a `terragrunt.hcl` under `modules/`, owning exactly one state key.
+- **`root.hcl`** — the only place the OpenTofu binary and the S3 remote state are configured.
+- **generated file** — `_backend.tf` / `_provider.tf`, rewritten by Terragrunt on every run.
+- **`--all`** — Terragrunt flag that fans a command out to every descendant unit.
+- **`environment: deploy`** — the GitHub environment gating the apply job; applying to `main`
+  goes through it, not through a local run.
+
+## Boundaries
+
+### Always
+
+- Use `tofu`, not `terraform`: `root.hcl` sets `terraform_binary = "tofu"` and CI runs OpenTofu.
+- Run unit-scoped commands from that unit's directory; run repo-wide commands from the
+  repository root with `--all`.
+- Open a pull request for changes under `modules/`. CI plans every module on the PR and
+  comments the diff; only `main` reaches apply.
+- Keep the formatters clean: `tofu fmt -check -recursive` (enforced by CI) and
+  `terragrunt hcl format --check` (enforced by the `terragrunt_fmt` pre-commit hook).
+- Keep the infrastructure arm64-compatible: the cluster is 4x Raspberry Pi 5.
+
+### Ask first
+
+- Changing `root.hcl`, or any `_backend.tf` state-backend configuration. Altering the bucket,
+  key pattern, or region can orphan or split state.
+- Adding a unit. It needs a `terragrunt.hcl`, a non-colliding state key, and an entry in the
+  `deploy.yaml` plan matrix.
+- Replacing the state bucket or the GitHub OIDC role in `bootstrap/`.
+- Anything that moves the `10.0.0.99` load-balancer IP or the `argocd.cowlab.org`,
+  `signoz.cowlab.org`, and `dex.cowlab.org` hostnames — the cluster repo depends on them.
+
+### Never
+
+- Never hand-edit `_backend.tf` or `_provider.tf`. Terragrunt regenerates them, so the edit is
+  silently lost.
+- Never commit a `.tfstate`, a `tfplan.tfplan`, or a `.terraform/` directory; `.gitignore`
+  covers them.
+- Never hardcode a secret, token, or kubeconfig in HCL. Unit inputs come from environment
+  variables or GitHub Actions secrets.
+- Never run `apply` or `destroy` against `main` outside CI, and never `apply --all` by hand.
+- Never bypass the `deploy` environment's approval to force an apply.
+
+## Generated / Do-Not-Touch Paths
+
+Terragrunt writes these on every run, and the generating blocks use
+`if_exists = "overwrite_terragrunt"`, so manual edits are disposable:
+
+- `modules/**/_backend.tf` — generated from the `remote_state` block in `root.hcl`.
+- `modules/**/_provider.tf` — generated from each unit's `generate "provider"` block.
+- `.terragrunt-cache/`, `.terraform/` — ignored entirely; never edit or commit them.
+
+The generated files are committed so a cold checkout has a usable OpenTofu configuration.
+Regenerating them should therefore be a no-op in `git diff`. If a diff appears, the
+generating block changed — commit that change, and let the generated file follow.
+
+## Secret Handling
+
+- Configuration reads secrets only through `get_env(...)`: `CLOUDFLARE_API_TOKEN`,
+  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `ALLOWED_EMAILS`,
+  `SIGNOZ_ENDPOINT`, `SIGNOZ_ACCESS_TOKEN`, and `KUBECONFIG` (base64, `argocd-*` units only).
+- In CI these come from GitHub Actions secrets and variables; locally, export them in the
+  shell. Never write a value into a `.tf`, `.hcl`, or `.yaml` file.
+- `SIGNOZ_ACCESS_TOKEN` is read by the provider directly from the environment, so it stays
+  out of both `_provider.tf` and Terraform state. Keep it that way.
+- `detect-private-key` runs as a pre-commit hook, and `.gitignore` covers `.env`. If a new
+  secret is needed, add it as an Actions secret and reference it from the `deploy.yaml` env
+  block — not from a committed file.

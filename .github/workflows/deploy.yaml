@@ -2,14 +2,22 @@ name: Deploy Terraform
 
 on:
   pull_request:
+    # root.hcl and common-inputs.yaml are read by every unit through
+    # find_in_parent_folders, so a change to either can affect all of them.
     paths:
+      - "root.hcl"
+      - "common-inputs.yaml"
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"
   push:
     branches:
       - main
+    # root.hcl and common-inputs.yaml are read by every unit through
+    # find_in_parent_folders, so a change to either can affect all of them.
     paths:
+      - "root.hcl"
+      - "common-inputs.yaml"
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"

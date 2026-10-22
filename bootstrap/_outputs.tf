@@ -12,3 +12,8 @@ output "terraform_role_arn" {
   description = "ARN of the Terraform operations IAM role"
   value       = aws_iam_role.terraform_operations.arn
 }
+
+output "terraform_plan_role_arn" {
+  description = "ARN of the read-only Terraform plan IAM role"
+  value       = aws_iam_role.terraform_plan.arn
+}

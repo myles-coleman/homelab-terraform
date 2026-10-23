@@ -100,7 +100,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # Posting and rewriting the plan comment on the branch's pull request.
       pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -196,10 +198,11 @@ jobs:
         working-directory: ./modules/${{ matrix.module }}
 
       # The plan job runs on a push, so there is no `pull_request` payload to
-      # comment against. Find the open pull request whose head is this branch
-      # (empty on `main` and on branches without one) and give the commenter the
-      # one field it reads from the event, so it keeps its per-module headers and
-      # previous-comment hiding instead of us re-rendering the diff.
+      # comment against and the commenter action declines to post (it only acts
+      # on pull_request events). It still renders the diff into its
+      # `comment-body` output, so find the open pull request whose head is this
+      # branch and post that body ourselves, rewriting our previous comment for
+      # the module instead of stacking a new one on every push.
       - name: Find the pull request for this branch
         id: pull-request
         if: github.ref != 'refs/heads/main'
@@ -210,19 +213,20 @@ jobs:
             --json number --limit 1 --jq '.[0].number // empty')"
           echo "number=${number}" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare the plan comment event
-        if: steps.pull-request.outputs.number != ''
+      # Keeps the old behaviour: no comment when a plan has nothing to report.
+      - name: Check the plan has changes
+        id: changes
         run: |
-          printf '{"pull_request":{"number":%s}}\n' \
-            "${{ steps.pull-request.outputs.number }}" \
-            > "${RUNNER_TEMP}/plan-comment-event.json"
+          if jq -e '[.resource_changes[]? | select(.change.actions != ["no-op"])] | length > 0' \
+            "modules/${{ matrix.module }}/tfplan.json" > /dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Comment Plan Changes
-        if: steps.pull-request.outputs.number != ''
+      - name: Render Plan Changes
+        id: plan-comment
         uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
-        env:
-          GITHUB_EVENT_NAME: pull_request
-          GITHUB_EVENT_PATH: ${{ runner.temp }}/plan-comment-event.json
         with:
           json-file: ./modules/${{ matrix.module }}/tfplan.json
           comment-header: "Terraform Plan for ${{ matrix.module }}"
@@ -231,6 +235,34 @@ jobs:
           log-changed-resources: 'false'
           include-workflow-link: 'true'
           quiet: 'true'
+
+      - name: Post Plan Changes
+        if: steps.pull-request.outputs.number != '' && steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.number }}
+          MODULE: ${{ matrix.module }}
+          PLAN_BODY: ${{ steps.plan-comment.outputs.comment-body }}
+        run: |
+          # A stable marker lets a later push rewrite this module's comment
+          # rather than posting another copy.
+          marker="<!-- terraform-plan: ${MODULE} -->"
+          body="$(printf '%s\n%s' "${marker}" "${PLAN_BODY}")"
+          existing="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"${marker}\")) | .id" \
+            | tail -n 1)"
+          if [ -n "${existing}" ]; then
+            printf '%s' "${body}" \
+              | gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+                  -F body=@- > /dev/null
+            echo "Updated plan comment ${existing} for ${MODULE}"
+          else
+            printf '%s' "${body}" \
+              | gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                  -F body=@- > /dev/null
+            echo "Created plan comment for ${MODULE}"
+          fi
 
   apply:
     name: Apply

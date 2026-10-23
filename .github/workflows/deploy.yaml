@@ -32,7 +32,12 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy
+  # Push and dispatch runs share one group so plan (which writes `<key>.tflock`)
+  # and apply never race each other across branches. Pull-request runs are
+  # credential-free and touch no state, so they get their own per-ref group;
+  # otherwise every branch commit queues a push run and a pull-request run in
+  # the same group and GitHub cancels the one that is still pending.
+  group: ${{ github.event_name == 'pull_request' && format('deploy-pr-{0}', github.ref) || 'deploy' }}
   cancel-in-progress: false
 
 env:

@@ -1,7 +1,17 @@
 name: Deploy Terraform
 
 on:
-  pull_request:
+  # Credentialed plans run on pushes to a branch of *this* repository, not on
+  # pull requests. The plan role is trusted only for `ref:refs/heads/*` subjects
+  # (bootstrap/oidc.tf "Plan role"), and only a push here produces one: a
+  # `pull_request` run presents `repo:<owner>/<repo>:pull_request` whether its
+  # head branch lives in this repository or in a fork, so that subject cannot be
+  # scoped to same-repository pull requests. Pull requests instead get the
+  # formatters and a backend-less validate, with no cloud credentials, no
+  # repository secrets and no tailnet node.
+  push:
+    branches:
+      - "**"
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
     paths:
@@ -10,9 +20,7 @@ on:
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"
-  push:
-    branches:
-      - main
+  pull_request:
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
     paths:
@@ -33,19 +41,70 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
+  # Pull-request entry point. Nothing here can reach the account: no `id-token`,
+  # no `secrets`, no `vars` beyond the tool versions. The placeholder values
+  # exist only because Terragrunt's get_env() calls need *some* value; the
+  # Cloudflare token is shaped like a real one because the provider validates it.
+  validate:
+    name: Validate (${{ matrix.module }})
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Keep in sync with the plan matrix below; a unit needs an entry in both.
+      matrix:
+        module:
+          - argocd-configure
+          - argocd-install
+          - cloudflare
+          - s3-backups
+          - signoz-dashboards/homelab-overview
+          - signoz-dashboards/network-speeds
+          - signoz-dashboards/pi5-thermal
+    env:
+      CLOUDFLARE_API_TOKEN: "placeholder0000000000000000000000000000000"
+      GOOGLE_OAUTH_CLIENT_ID: "placeholder"
+      GOOGLE_OAUTH_CLIENT_SECRET: "placeholder"
+      ALLOWED_EMAILS: "nobody@example.invalid"
+      SIGNOZ_ENDPOINT: "https://signoz.invalid"
+      SIGNOZ_ACCESS_TOKEN: "placeholder"
+      # `terragrunt validate` initialises first; without this it would talk to
+      # the S3 backend and need AWS credentials, which pull requests never get.
+      TF_CLI_ARGS_init: "-backend=false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install Terragrunt and OpenTofu
+        uses: gruntwork-io/terragrunt-action@5e86476ca61eaf74adb9c0525745f29f921f2199 # v3.1.0
+        with:
+          tg_version: ${{ env.tg_version }}
+          tofu_version: ${{ env.tofu_version }}
+
+      - name: Terraform Format
+        run: tofu fmt -check -recursive
+        working-directory: ./modules/${{ matrix.module }}
+
+      - name: Terragrunt Validate
+        run: terragrunt validate
+        working-directory: ./modules/${{ matrix.module }}
+
   plan:
     name: Plan (${{ matrix.module }})
+    # Belt and braces: the plan role's trust policy only matches push refs, so
+    # this guard cannot be the thing that keeps credentials away from a pull
+    # request — bootstrap/oidc.tf does that.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       id-token: write
       pull-requests: write
     runs-on: ubuntu-latest
-    # A fork's Terragrunt configuration is attacker-controlled and this job can
-    # read Terraform state, which contains generated secrets. Never request AWS
-    # credentials for a pull request from a fork.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
+      # Keep in sync with the validate matrix above; a unit needs an entry in both.
       matrix:
         module:
           - argocd-configure
@@ -136,9 +195,34 @@ jobs:
           terragrunt show -json tfplan.tfplan > tfplan.json
         working-directory: ./modules/${{ matrix.module }}
 
+      # The plan job runs on a push, so there is no `pull_request` payload to
+      # comment against. Find the open pull request whose head is this branch
+      # (empty on `main` and on branches without one) and give the commenter the
+      # one field it reads from the event, so it keeps its per-module headers and
+      # previous-comment hiding instead of us re-rendering the diff.
+      - name: Find the pull request for this branch
+        id: pull-request
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number="$(gh pr list --head "${GITHUB_REF_NAME}" --state open \
+            --json number --limit 1 --jq '.[0].number // empty')"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare the plan comment event
+        if: steps.pull-request.outputs.number != ''
+        run: |
+          printf '{"pull_request":{"number":%s}}\n' \
+            "${{ steps.pull-request.outputs.number }}" \
+            > "${RUNNER_TEMP}/plan-comment-event.json"
+
       - name: Comment Plan Changes
-        if: github.event_name == 'pull_request'
+        if: steps.pull-request.outputs.number != ''
         uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_PATH: ${{ runner.temp }}/plan-comment-event.json
         with:
           json-file: ./modules/${{ matrix.module }}/tfplan.json
           comment-header: "Terraform Plan for ${{ matrix.module }}"

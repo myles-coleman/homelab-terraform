@@ -55,10 +55,19 @@ data "aws_iam_policy_document" "github_actions_assume_operations" {
   }
 }
 
-# Plan role, used by the plan job on pull requests and on `main`. The workflow
-# additionally refuses to request AWS credentials for pull requests from forks
-# (.github/workflows/deploy.yaml), because a fork's Terragrunt configuration is
-# attacker-controlled and this role can read Terraform state.
+# Plan role, used by credentialed plan runs, which only ever happen on a push to
+# a branch of this repository (.github/workflows/deploy.yaml). Trust is anchored
+# on that ref, because it is the one subject shape a fork cannot produce: a
+# fork's push carries the fork's own owner and repository ids, and pushing to a
+# branch here needs write access here.
+#
+# `pull_request` is deliberately absent. A pull-request run presents
+# `repo:...:pull_request` whether its head branch lives in this repository or in
+# a fork, so that subject cannot express "same repository only"; the `if:` that
+# excludes forks lives in the workflow file the pull request itself supplies, so
+# it is not an authorization boundary. Nothing on the pull_request path asks for
+# AWS credentials at all: those runs get the formatters and a backend-less
+# validate.
 data "aws_iam_policy_document" "github_actions_assume_plan" {
   statement {
     effect = "Allow"
@@ -71,11 +80,12 @@ data "aws_iam_policy_document" "github_actions_assume_plan" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
+      # Any branch in this repository, including `main`. `*` also matches `/`,
+      # so namespaced branch names such as `feat/plan-trust` are covered.
       values = [
-        "repo:myles-coleman@44505855/homelab-terraform@1329076037:pull_request",
-        "repo:myles-coleman@44505855/homelab-terraform@1329076037:ref:refs/heads/main",
+        "repo:myles-coleman@44505855/homelab-terraform@1329076037:ref:refs/heads/*",
       ]
     }
 

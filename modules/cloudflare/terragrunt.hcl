@@ -4,7 +4,6 @@ include {
 
 locals {
   common_inputs              = yamldecode(file(find_in_parent_folders("common-inputs.yaml")))
-  cloudflare_api_token       = get_env("CLOUDFLARE_API_TOKEN")
   google_oauth_client_id     = get_env("GOOGLE_OAUTH_CLIENT_ID")
   google_oauth_client_secret = get_env("GOOGLE_OAUTH_CLIENT_SECRET")
   allowed_emails             = [for email in split(",", get_env("ALLOWED_EMAILS")) : trimspace(replace(email, "\"", ""))]
@@ -26,7 +25,8 @@ generate "provider" {
   if_exists = "overwrite_terragrunt"
   contents  = <<EOF
 provider "cloudflare" {
-  api_token = "${local.cloudflare_api_token}"
+  # The API token is read from the CLOUDFLARE_API_TOKEN environment variable, so
+  # it is never written into this generated file or into Terraform state.
 }
 EOF
 }

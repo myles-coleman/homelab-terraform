@@ -3,9 +3,10 @@
 Terragrunt + OpenTofu root for the `cowlab.org` homelab. Every directory under `modules/`
 is an independent unit with its own S3 state key, so units apply independently.
 
-`.github/workflows/deploy.yaml` is the only CI entry point: it plans every unit on a pull
-request, applies on `main` behind the `deploy` GitHub environment, then runs a telemetry
-smoke query.
+`.github/workflows/deploy.yaml` is the only CI entry point: on a pull request it runs the
+formatters and a backend-less validate with no credentials; on a push to a branch it plans
+every unit and comments the diff on that branch's pull request; on `main` it then applies
+behind the `deploy` GitHub environment and runs a telemetry smoke query.
 
 ## Units
 
@@ -77,6 +78,11 @@ committed file.
 
 In CI these come from GitHub Actions secrets and variables. Locally, export them in your
 shell.
+
+CI holds no long-lived AWS keys: the plan and apply jobs assume roles through GitHub OIDC.
+The plan role is assumable only by push runs on a branch of this repository, so pull-request
+runs — which cannot be distinguished from fork runs by their OIDC subject — get no AWS
+credentials at all.
 
 ## Layout
 

@@ -1,7 +1,17 @@
 name: Deploy Terraform
 
 on:
-  pull_request:
+  # Credentialed plans run on pushes to a branch of *this* repository, not on
+  # pull requests. The plan role is trusted only for `ref:refs/heads/*` subjects
+  # (bootstrap/oidc.tf "Plan role"), and only a push here produces one: a
+  # `pull_request` run presents `repo:<owner>/<repo>:pull_request` whether its
+  # head branch lives in this repository or in a fork, so that subject cannot be
+  # scoped to same-repository pull requests. Pull requests instead get the
+  # formatters and a backend-less validate, with no cloud credentials, no
+  # repository secrets and no tailnet node.
+  push:
+    branches:
+      - "**"
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
     paths:
@@ -10,9 +20,7 @@ on:
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"
-  push:
-    branches:
-      - main
+  pull_request:
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
     paths:
@@ -24,7 +32,12 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy
+  # Push and dispatch runs share one group so plan (which writes `<key>.tflock`)
+  # and apply never race each other across branches. Pull-request runs are
+  # credential-free and touch no state, so they get their own per-ref group;
+  # otherwise every branch commit queues a push run and a pull-request run in
+  # the same group and GitHub cancels the one that is still pending.
+  group: ${{ github.event_name == 'pull_request' && format('deploy-pr-{0}', github.ref) || 'deploy' }}
   cancel-in-progress: false
 
 env:
@@ -33,19 +46,72 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
+  # Pull-request entry point. Nothing here can reach the account: no `id-token`,
+  # no `secrets`, no `vars` beyond the tool versions. The placeholder values
+  # exist only because Terragrunt's get_env() calls need *some* value; the
+  # Cloudflare token is shaped like a real one because the provider validates it.
+  validate:
+    name: Validate (${{ matrix.module }})
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Keep in sync with the plan matrix below; a unit needs an entry in both.
+      matrix:
+        module:
+          - argocd-configure
+          - argocd-install
+          - cloudflare
+          - s3-backups
+          - signoz-dashboards/homelab-overview
+          - signoz-dashboards/network-speeds
+          - signoz-dashboards/pi5-thermal
+    env:
+      CLOUDFLARE_API_TOKEN: "placeholder0000000000000000000000000000000"
+      GOOGLE_OAUTH_CLIENT_ID: "placeholder"
+      GOOGLE_OAUTH_CLIENT_SECRET: "placeholder"
+      ALLOWED_EMAILS: "nobody@example.invalid"
+      SIGNOZ_ENDPOINT: "https://signoz.invalid"
+      SIGNOZ_ACCESS_TOKEN: "placeholder"
+      # `terragrunt validate` initialises first; without this it would talk to
+      # the S3 backend and need AWS credentials, which pull requests never get.
+      TF_CLI_ARGS_init: "-backend=false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Install Terragrunt and OpenTofu
+        uses: gruntwork-io/terragrunt-action@5e86476ca61eaf74adb9c0525745f29f921f2199 # v3.1.0
+        with:
+          tg_version: ${{ env.tg_version }}
+          tofu_version: ${{ env.tofu_version }}
+
+      - name: Terraform Format
+        run: tofu fmt -check -recursive
+        working-directory: ./modules/${{ matrix.module }}
+
+      - name: Terragrunt Validate
+        run: terragrunt validate
+        working-directory: ./modules/${{ matrix.module }}
+
   plan:
     name: Plan (${{ matrix.module }})
+    # Belt and braces: the plan role's trust policy only matches push refs, so
+    # this guard cannot be the thing that keeps credentials away from a pull
+    # request — bootstrap/oidc.tf does that.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       id-token: write
+      # Posting and rewriting the plan comment on the branch's pull request.
       pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
-    # A fork's Terragrunt configuration is attacker-controlled and this job can
-    # read Terraform state, which contains generated secrets. Never request AWS
-    # credentials for a pull request from a fork.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
+      # Keep in sync with the validate matrix above; a unit needs an entry in both.
       matrix:
         module:
           - argocd-configure
@@ -136,8 +202,35 @@ jobs:
           terragrunt show -json tfplan.tfplan > tfplan.json
         working-directory: ./modules/${{ matrix.module }}
 
-      - name: Comment Plan Changes
-        if: github.event_name == 'pull_request'
+      # The plan job runs on a push, so there is no `pull_request` payload to
+      # comment against and the commenter action declines to post (it only acts
+      # on pull_request events). It still renders the diff into its
+      # `comment-body` output, so find the open pull request whose head is this
+      # branch and post that body ourselves, rewriting our previous comment for
+      # the module instead of stacking a new one on every push.
+      - name: Find the pull request for this branch
+        id: pull-request
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number="$(gh pr list --head "${GITHUB_REF_NAME}" --state open \
+            --json number --limit 1 --jq '.[0].number // empty')"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      # Keeps the old behaviour: no comment when a plan has nothing to report.
+      - name: Check the plan has changes
+        id: changes
+        run: |
+          if jq -e '[.resource_changes[]? | select(.change.actions != ["no-op"])] | length > 0' \
+            "modules/${{ matrix.module }}/tfplan.json" > /dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Render Plan Changes
+        id: plan-comment
         uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
         with:
           json-file: ./modules/${{ matrix.module }}/tfplan.json
@@ -147,6 +240,34 @@ jobs:
           log-changed-resources: 'false'
           include-workflow-link: 'true'
           quiet: 'true'
+
+      - name: Post Plan Changes
+        if: steps.pull-request.outputs.number != '' && steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.number }}
+          MODULE: ${{ matrix.module }}
+          PLAN_BODY: ${{ steps.plan-comment.outputs.comment-body }}
+        run: |
+          # A stable marker lets a later push rewrite this module's comment
+          # rather than posting another copy.
+          marker="<!-- terraform-plan: ${MODULE} -->"
+          body="$(printf '%s\n%s' "${marker}" "${PLAN_BODY}")"
+          existing="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"${marker}\")) | .id" \
+            | tail -n 1)"
+          if [ -n "${existing}" ]; then
+            printf '%s' "${body}" \
+              | gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+                  -F body=@- > /dev/null
+            echo "Updated plan comment ${existing} for ${MODULE}"
+          else
+            printf '%s' "${body}" \
+              | gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                  -F body=@- > /dev/null
+            echo "Created plan comment for ${MODULE}"
+          fi
 
   apply:
     name: Apply

@@ -58,6 +58,9 @@ variables they need.
 - **`--all`** — Terragrunt flag that fans a command out to every descendant unit.
 - **`environment: deploy`** — the GitHub environment gating the apply job; applying to `main`
   goes through it, not through a local run.
+- **plan trust anchor** — the plan role trusts only the `ref:refs/heads/*` OIDC subject, which
+  only a push to a branch of this repository can present; `pull_request` runs get no AWS
+  credentials at all.
 
 ## Boundaries
 
@@ -66,8 +69,9 @@ variables they need.
 - Use `tofu`, not `terraform`: `root.hcl` sets `terraform_binary = "tofu"` and CI runs OpenTofu.
 - Run unit-scoped commands from that unit's directory; run repo-wide commands from the
   repository root with `--all`.
-- Open a pull request for changes under `modules/`. CI plans every module on the PR and
-  comments the diff; only `main` reaches apply.
+- Open a pull request for changes under `modules/`. CI validates every module on the PR (no
+  credentials), plans every module on each branch push and comments the diff on that branch's
+  pull request; only `main` reaches apply.
 - Keep the formatters clean: `tofu fmt -check -recursive` (enforced by CI) and
   `terragrunt hcl format --check` (enforced by the `terragrunt_fmt` pre-commit hook).
 - Keep the infrastructure arm64-compatible: the cluster is 4x Raspberry Pi 5.
@@ -76,8 +80,8 @@ variables they need.
 
 - Changing `root.hcl`, or any `_backend.tf` state-backend configuration. Altering the bucket,
   key pattern, or region can orphan or split state.
-- Adding a unit. It needs a `terragrunt.hcl`, a non-colliding state key, and an entry in the
-  `deploy.yaml` plan matrix.
+- Adding a unit. It needs a `terragrunt.hcl`, a non-colliding state key, and an entry in both
+  the `validate` and `plan` matrices in `deploy.yaml`.
 - Replacing the state bucket or the GitHub OIDC role in `bootstrap/`.
 - Anything that moves the `10.0.0.99` load-balancer IP or the `argocd.cowlab.org`,
   `signoz.cowlab.org`, and `dex.cowlab.org` hostnames — the cluster repo depends on them.
@@ -91,6 +95,9 @@ variables they need.
 - Never hardcode a secret, token, or kubeconfig in HCL. Unit inputs come from environment
   variables or GitHub Actions secrets.
 - Never run `apply` or `destroy` against `main` outside CI, and never `apply --all` by hand.
+- Never let a `pull_request` run hold AWS credentials. Its OIDC subject is
+  `repo:<owner>/<repo>:pull_request` whether the head branch is in this repository or a fork,
+  so it cannot express "same repository only"; the plan role trusts `ref:refs/heads/*` instead.
 - Never bypass the `deploy` environment's approval to force an apply.
 
 ## Generated / Do-Not-Touch Paths

@@ -96,6 +96,21 @@ jobs:
         run: terragrunt validate
         working-directory: ./modules/${{ matrix.module }}
 
+      # Regression gate: Terragrunt rewrites `_backend.tf` and `_provider.tf` on
+      # every run, and a pre-1.0 Terragrunt writes them into the unit directory
+      # rather than into `.terragrunt-cache`. They are gitignored now, so a run
+      # can only dirty the tree if a generated file was force-added, or if a unit
+      # started interpolating something environment-derived into one. The
+      # placeholder CLOUDFLARE_API_TOKEN above makes that second case show up as a
+      # modified tracked file instead of a committed credential.
+      - name: Check Terragrunt wrote nothing tracked
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            git --no-pager diff
+            echo "::error::terragrunt modified a tracked file; generated files must stay gitignored (#10)"
+            exit 1
+          fi
+
   plan:
     name: Plan (${{ matrix.module }})
     # Belt and braces: the plan role's trust policy only matches push refs, so

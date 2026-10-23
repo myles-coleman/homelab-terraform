@@ -16,7 +16,8 @@ modules/argocd-configure/      # ArgoCD bootstrap configuration
 modules/s3-backups/            # backup bucket + lifecycle policy
 modules/signoz-dashboards/     # declarative SigNoz dashboards (has its own README)
 scripts/                       # signoz-dashboard-smoke.sh
-.github/workflows/deploy.yaml  # the only CI entry point
+.github/workflows/deploy.yaml  # format, validate on PR, plan on push, apply on main
+.github/workflows/secrets.yaml # gitleaks gate over the full history
 ```
 
 Each directory under `modules/` is its own unit with its own state key
@@ -54,7 +55,8 @@ variables they need.
 
 - **unit** — a directory with a `terragrunt.hcl` under `modules/`, owning exactly one state key.
 - **`root.hcl`** — the only place the OpenTofu binary and the S3 remote state are configured.
-- **generated file** — `_backend.tf` / `_provider.tf`, rewritten by Terragrunt on every run.
+- **generated file** — `_backend.tf` / `_provider.tf`, rewritten by Terragrunt on every run
+  and gitignored: it is build output, not source.
 - **`--all`** — Terragrunt flag that fans a command out to every descendant unit.
 - **`environment: deploy`** — the GitHub environment gating the apply job; applying to `main`
   goes through it, not through a local run.
@@ -90,10 +92,14 @@ variables they need.
 
 - Never hand-edit `_backend.tf` or `_provider.tf`. Terragrunt regenerates them, so the edit is
   silently lost.
-- Never commit a `.tfstate`, a `tfplan.tfplan`, or a `.terraform/` directory; `.gitignore`
-  covers them.
+- Never commit a `.tfstate`, a `tfplan.tfplan`, a `.terraform/` directory, or a generated
+  `_backend.tf` / `_provider.tf`; `.gitignore` covers them all.
 - Never hardcode a secret, token, or kubeconfig in HCL. Unit inputs come from environment
   variables or GitHub Actions secrets.
+- Never interpolate `get_env(...)` into a `generate` block. The generating block is written to
+  disk on every run, so a credential placed there is a file waiting to be committed — providers
+  read their tokens from the environment themselves (`CLOUDFLARE_API_TOKEN`,
+  `SIGNOZ_ACCESS_TOKEN`).
 - Never run `apply` or `destroy` against `main` outside CI, and never `apply --all` by hand.
 - Never let a `pull_request` run hold AWS credentials. Its OIDC subject is
   `repo:<owner>/<repo>:pull_request` whether the head branch is in this repository or a fork,
@@ -109,9 +115,12 @@ Terragrunt writes these on every run, and the generating blocks use
 - `modules/**/_provider.tf` — generated from each unit's `generate "provider"` block.
 - `.terragrunt-cache/`, `.terraform/` — ignored entirely; never edit or commit them.
 
-The generated files are committed so a cold checkout has a usable OpenTofu configuration.
-Regenerating them should therefore be a no-op in `git diff`. If a diff appears, the
-generating block changed — commit that change, and let the generated file follow.
+None of them are tracked. Nothing under `modules/` needs them in a cold checkout: Terragrunt
+writes them before it invokes OpenTofu, into the unit directory on pre-1.0 releases and into
+`.terragrunt-cache/` from 1.0 on. They were committed once, which is why a `git diff` after a
+run used to be meaningful; now it must be empty, and a non-empty one means someone force-added
+a generated file. Change the generating block and the next run produces the new file.
+`bootstrap/_backend.tf` is the exception: it is hand-written plain OpenTofu, not generated.
 
 ## Secret Handling
 
@@ -120,8 +129,12 @@ generating block changed — commit that change, and let the generated file foll
   `SIGNOZ_ENDPOINT`, `SIGNOZ_ACCESS_TOKEN`, and `KUBECONFIG` (base64, `argocd-*` units only).
 - In CI these come from GitHub Actions secrets and variables; locally, export them in the
   shell. Never write a value into a `.tf`, `.hcl`, or `.yaml` file.
-- `SIGNOZ_ACCESS_TOKEN` is read by the provider directly from the environment, so it stays
-  out of both `_provider.tf` and Terraform state. Keep it that way.
-- `detect-private-key` runs as a pre-commit hook, and `.gitignore` covers `.env`. If a new
-  secret is needed, add it as an Actions secret and reference it from the `deploy.yaml` env
-  block — not from a committed file.
+- `SIGNOZ_ACCESS_TOKEN` and `CLOUDFLARE_API_TOKEN` are read by their providers directly from
+  the environment, so they stay out of `_provider.tf` and Terraform state. Keep it that way:
+  the generated provider blocks are `provider "cloudflare" {}` and
+  `provider "signoz" { endpoint = ... }`, with no credential line.
+- `gitleaks` is the gate that matches credential shapes: as the `gitleaks-system` pre-commit
+  hook (`gitleaks` must be on PATH) and over the full history in
+  `.github/workflows/secrets.yaml`, which has no `paths` filter on purpose. `detect-private-key`
+  also runs, and `.gitignore` covers `.env`. If a new secret is needed, add it as an Actions
+  secret and reference it from the `deploy.yaml` env block — not from a committed file.

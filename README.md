@@ -3,10 +3,13 @@
 Terragrunt + OpenTofu root for the `cowlab.org` homelab. Every directory under `modules/`
 is an independent unit with its own S3 state key, so units apply independently.
 
-`.github/workflows/deploy.yaml` is the only CI entry point: on a pull request it runs the
-formatters and a backend-less validate with no credentials; on a push to a branch it plans
-every unit and comments the diff on that branch's pull request; on `main` it then applies
-behind the `deploy` GitHub environment and runs a telemetry smoke query.
+`.github/workflows/deploy.yaml` is the CI entry point for the configuration: on a pull
+request it runs the formatters and a backend-less validate with no credentials; on a push to a
+branch it plans every unit and comments the diff on that branch's pull request; on `main` it
+then applies behind the `deploy` GitHub environment and runs a telemetry smoke query.
+`.github/workflows/secrets.yaml` is the other one: it scans the full history with gitleaks on
+every push and pull request, with no path filter, so a token pasted into a document cannot
+slip past it.
 
 ## Units
 
@@ -57,6 +60,10 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+The same hooks run a gitleaks secret scan on staged files, so `gitleaks` has to be on `PATH`
+(`nix shell nixpkgs#gitleaks`). CI does not depend on it — `.github/workflows/secrets.yaml`
+installs its own pinned release and scans the whole history.
+
 Unit-level schema validation works without AWS credentials by stopping after
 `terragrunt init -backend=false`; see
 [`modules/signoz-dashboards/README.md`](modules/signoz-dashboards/README.md) for the
@@ -79,6 +86,10 @@ committed file.
 In CI these come from GitHub Actions secrets and variables. Locally, export them in your
 shell.
 
+`CLOUDFLARE_API_TOKEN` and `SIGNOZ_ACCESS_TOKEN` are never written into a generated file:
+their providers read them from the environment, and the generate blocks interpolate only
+non-secret values.
+
 CI holds no long-lived AWS keys: the plan and apply jobs assume roles through GitHub OIDC.
 The plan role is assumable only by push runs on a branch of this repository, so pull-request
 runs — which cannot be distinguished from fork runs by their OIDC subject — get no AWS
@@ -94,14 +105,18 @@ modules/terragrunt.hcl         # include-only stub that points units at root.hcl
 modules/<unit>/                # one state key per unit
 scripts/signoz-dashboard-smoke.sh
 .github/workflows/deploy.yaml  # plan on PR, apply on main, then smoke query
+.github/workflows/secrets.yaml # gitleaks over the full history, every push and PR
 ```
 
 ## Generated files
 
 Terragrunt rewrites `modules/**/_backend.tf` and `modules/**/_provider.tf` on every run
-(`if_exists = "overwrite_terragrunt"`), so hand edits are lost. They are committed so a
-cold checkout has a usable OpenTofu configuration, and regenerating them should be a no-op
-in `git diff`.
+(`if_exists = "overwrite_terragrunt"`), so hand edits are lost. They are build output and are
+gitignored rather than committed: Terragrunt generates them before OpenTofu runs, into the
+unit directory on pre-1.0 releases and into `.terragrunt-cache/` from 1.0 on. A `git diff`
+after a run is therefore always empty, and a non-empty one means a generated file was
+force-added. The generate blocks never interpolate a credential, so nothing that depends on
+the environment can reach the tree.
 
 [`AGENTS.md`](AGENTS.md) carries the fuller operating guidance, boundaries, and glossary
 for coding agents.

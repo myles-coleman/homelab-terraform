@@ -376,11 +376,17 @@ data "aws_iam_policy_document" "terraform_plan_bootstrap" {
   }
 
   # The bucket resources in state-bucket.tf: bucket, SSE, versioning and the
-  # public access block. Same read set the unit plan roles use for their buckets.
+  # public access block. Same read set the unit plan roles use for their buckets,
+  # plus s3:ListBucket: the aws_s3_bucket read is a HeadBucket, and a 403 there
+  # makes the provider conclude the bucket has been deleted - which turns the
+  # plan into "create the bucket, replace its three sub-resources" and makes the
+  # review comment lie. The unit roles never refresh a bucket resource, so they
+  # do not need it.
   statement {
     sid    = "ReadStateBucketResources"
     effect = "Allow"
     actions = [
+      "s3:ListBucket",
       "s3:GetBucketAcl",
       "s3:GetBucketLocation",
       "s3:GetBucketOwnershipControls",

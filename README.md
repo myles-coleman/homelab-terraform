@@ -11,6 +11,10 @@ then applies behind the `deploy` GitHub environment and runs a telemetry smoke q
 every push and pull request, with no path filter, so a token pasted into a document cannot
 slip past it.
 
+The unit list in CI is discovered, not hand-written: the `units` job lists
+`modules/*/terragrunt.hcl` with `git ls-files` and feeds both the validate and plan matrices,
+so a new unit needs no workflow edit.
+
 ## Units
 
 | Unit | Manages |
@@ -106,7 +110,7 @@ bootstrap/                     # one-time: state bucket, OIDC provider, per-unit
 modules/terragrunt.hcl         # include-only stub that points units at root.hcl
 modules/<unit>/                # one state key per unit
 scripts/signoz-dashboard-smoke.sh
-.github/workflows/deploy.yaml  # plan on PR, apply on main, then smoke query
+.github/workflows/deploy.yaml  # discovery, PR validate, plan, apply, smoke
 .github/workflows/secrets.yaml # gitleaks over the full history, every push and PR
 ```
 

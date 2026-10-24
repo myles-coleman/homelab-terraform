@@ -37,6 +37,25 @@ variable "google_oauth_client_secret" {
 }
 
 variable "allowed_emails" {
-  description = "List of email addresses allowed to access applications via Cloudflare Access"
+  description = "Email addresses allowed to access applications via Cloudflare Access. The only input to the allow policy, so it must be neither empty nor malformed."
   type        = list(string)
+
+  # GitHub Actions resolves a missing secret to an empty string rather than to an
+  # absent variable, so a deleted ALLOWED_EMAILS reaches Terragrunt as "" and
+  # splits into [""] - fail-closed (the policy emits exact-match `email`
+  # includes, so nobody is admitted) but silent: the apply would rewrite the
+  # Access policy with a dead rule and nothing would report it. Reject it here,
+  # where the message can name the input that is wrong.
+  validation {
+    condition     = length(var.allowed_emails) > 0
+    error_message = "allowed_emails is empty, so the Cloudflare Access policy would allow nobody. ALLOWED_EMAILS is a repository secret, not a variable: restore it (gh secret set ALLOWED_EMAILS) and re-plan."
+  }
+
+  validation {
+    condition = alltrue([
+      for email in var.allowed_emails :
+      trimspace(email) != "" && can(regex("^[^@,;\\s]+@[^@,;\\s]+\\.[^@,;\\s]+$", email))
+    ])
+    error_message = "Every entry in ALLOWED_EMAILS must be a plain email address. A trailing or doubled comma leaves an empty entry that matches nobody, so the list is rejected rather than applied. Got: ${jsonencode(var.allowed_emails)}."
+  }
 }

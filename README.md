@@ -78,7 +78,7 @@ committed file.
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN` | `cloudflare` |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` | `cloudflare` |
-| `ALLOWED_EMAILS` | `cloudflare` — comma-separated |
+| `ALLOWED_EMAILS` | `cloudflare` — comma-separated; a repository secret, and an empty or malformed list fails the plan |
 | `SIGNOZ_ENDPOINT`, `SIGNOZ_ACCESS_TOKEN` | `signoz-dashboards` |
 | AWS credentials or OIDC role | S3 remote state, `s3-backups` |
 | `KUBECONFIG` | `argocd-*` only (base64-encoded in CI) |

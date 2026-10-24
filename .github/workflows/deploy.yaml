@@ -467,6 +467,10 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    # A branch-policy rule limits this environment to `main`; it has no required
+    # reviewers, because that protection rule is unavailable on this repository's
+    # plan. So this is not an approval step: a push to main applies. See AGENTS.md,
+    # "environment: deploy".
     environment: deploy
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

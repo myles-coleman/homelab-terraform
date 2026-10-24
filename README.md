@@ -6,7 +6,11 @@ is an independent unit with its own S3 state key, so units apply independently.
 `.github/workflows/deploy.yaml` is the CI entry point for the configuration: on a pull
 request it runs the formatters and a backend-less validate with no credentials; on a push to a
 branch it plans every unit and comments the diff on that branch's pull request; on `main` it
-then applies behind the `deploy` GitHub environment and runs a telemetry smoke query.
+then applies and runs a telemetry smoke query. The apply job's `deploy` environment is bounded
+to `main` by a branch policy but carries no required reviewers — this repository's plan does
+not support that rule — so **merging to `main` is the decision to apply**, and the plan comment
+on the pull request is the review.
+
 `.github/workflows/secrets.yaml` is the other one: it scans the full history with gitleaks on
 every push and pull request, with no path filter, so a token pasted into a document cannot
 slip past it.

@@ -74,6 +74,11 @@ variables they need.
   console — a node may only ask for exactly its credential's tags, so there is one credential
   per trust domain and Terraform does not manage them. See that unit's README for the two
   `tailscale_acl` defaults that stop a mistaken apply from clobbering it.
+- **bootstrap project** — the ArgoCD `AppProject` the root Application runs under
+  (`modules/argocd-configure/bootstrap.tf`): source `myles-coleman/homelab-cluster` only,
+  destination `argocd` only, `Application` objects only, and nothing cluster-scoped. It bounds
+  what the synced `manifests/bootstrap` path may create. The 46 child Applications it creates
+  still run under that repository's `default` project, which this tree cannot change.
 - **plan trust anchor** — the plan roles trust only the `ref:refs/heads/*` OIDC subject, which
   only a push to a branch of this repository can present; `pull_request` runs get no AWS
   credentials at all.

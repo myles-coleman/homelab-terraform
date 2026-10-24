@@ -11,6 +11,10 @@ then applies behind the `deploy` GitHub environment and runs a telemetry smoke q
 every push and pull request, with no path filter, so a token pasted into a document cannot
 slip past it.
 
+The unit list in CI is discovered, not hand-written: the `units` job lists
+`modules/*/terragrunt.hcl` with `git ls-files` and feeds both the validate and plan matrices,
+so a new unit needs no workflow edit.
+
 ## Units
 
 | Unit | Manages |
@@ -22,8 +26,8 @@ slip past it.
 | `modules/signoz-dashboards/{homelab-overview,network-speeds,pi5-thermal}/` | One SigNoz dashboard each. See [`modules/signoz-dashboards/README.md`](modules/signoz-dashboards/README.md). |
 
 `bootstrap/` is plain OpenTofu rather than Terragrunt, and is applied by hand once before
-any unit: it creates the S3 state bucket and the GitHub Actions OIDC role that everything
-else assumes. CI never touches it.
+any unit: it creates the S3 state bucket, the GitHub OIDC provider, one read-only plan role
+per unit, and the administrative apply role that everything else assumes. CI never touches it.
 
 ## Requirements
 
@@ -91,20 +95,22 @@ their providers read them from the environment, and the generate blocks interpol
 non-secret values.
 
 CI holds no long-lived AWS keys: the plan and apply jobs assume roles through GitHub OIDC.
-The plan role is assumable only by push runs on a branch of this repository, so pull-request
-runs — which cannot be distinguished from fork runs by their OIDC subject — get no AWS
-credentials at all.
+There is one plan role per unit (`terraform-plan-<unit slug>`), each able to read only its own
+unit's state prefix and write only that unit's `*.tflock`, so planning one unit cannot read
+another's state. They are assumable only by push runs on a branch of this repository, so
+pull-request runs — which cannot be distinguished from fork runs by their OIDC subject — get
+no AWS credentials at all.
 
 ## Layout
 
 ```
 root.hcl                       # shared Terragrunt root: OpenTofu binary + S3 remote state
 common-inputs.yaml             # shared values read by the units
-bootstrap/                     # one-time: state bucket + GitHub OIDC role
+bootstrap/                     # one-time: state bucket, OIDC provider, per-unit plan roles
 modules/terragrunt.hcl         # include-only stub that points units at root.hcl
 modules/<unit>/                # one state key per unit
 scripts/signoz-dashboard-smoke.sh
-.github/workflows/deploy.yaml  # plan on PR, apply on main, then smoke query
+.github/workflows/deploy.yaml  # discovery, PR validate, plan, apply, smoke
 .github/workflows/secrets.yaml # gitleaks over the full history, every push and PR
 ```
 

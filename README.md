@@ -27,7 +27,10 @@ so a new unit needs no workflow edit.
 
 `bootstrap/` is plain OpenTofu rather than Terragrunt, and is applied by hand once before
 any unit: it creates the S3 state bucket, the GitHub OIDC provider, one read-only plan role
-per unit, and the administrative apply role that everything else assumes. CI never touches it.
+per unit, and the administrative apply role that everything else assumes. CI never applies it,
+but it does plan it: every push plans `bootstrap/` with `terraform-plan-bootstrap` and comments
+the diff on the branch's pull request, so a trust-policy change is reviewed before a human
+runs `tofu apply`.
 
 ## Requirements
 
@@ -106,7 +109,7 @@ no AWS credentials at all.
 ```
 root.hcl                       # shared Terragrunt root: OpenTofu binary + S3 remote state
 common-inputs.yaml             # shared values read by the units
-bootstrap/                     # one-time: state bucket, OIDC provider, per-unit plan roles
+bootstrap/                     # hand-applied: state bucket, OIDC provider, plan roles (CI plans)
 modules/terragrunt.hcl         # include-only stub that points units at root.hcl
 modules/<unit>/                # one state key per unit
 scripts/signoz-dashboard-smoke.sh

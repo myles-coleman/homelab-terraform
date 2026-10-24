@@ -201,6 +201,38 @@ locals {
   backup_bucket     = "myles-homelab-backups"
   backup_iam_user   = "homelab-k3s-cluster-longhorn-backup-user"
   backup_iam_policy = "homelab-k3s-cluster-longhorn-backup-policy"
+
+  # The metadata reads the aws_s3_bucket* resources perform on refresh, scoped to
+  # one bucket each. The provider reads more than any single resource needs -
+  # CORS, accelerate and request payment among them - so this is the union, and
+  # it is what a plan of modules/s3-backups exercises on every run.
+  #
+  # s3:ListBucket is included because the aws_s3_bucket read is a HeadBucket, and
+  # a 403 there makes the provider report the bucket as deleted (which turns a
+  # plan into "create the bucket, replace its sub-resources", not an error).
+  # s3:ListBucketVersions is not: versioning is disabled or suspended here and
+  # nothing lists versions.
+  s3_bucket_read_actions = [
+    "s3:GetAccelerateConfiguration",
+    "s3:GetBucketAcl",
+    "s3:GetBucketCORS",
+    "s3:GetBucketLocation",
+    "s3:GetBucketLogging",
+    "s3:GetBucketNotification",
+    "s3:GetBucketObjectLockConfiguration",
+    "s3:GetBucketOwnershipControls",
+    "s3:GetBucketPolicy",
+    "s3:GetBucketPolicyStatus",
+    "s3:GetBucketPublicAccessBlock",
+    "s3:GetBucketRequestPayment",
+    "s3:GetBucketTagging",
+    "s3:GetBucketVersioning",
+    "s3:GetBucketWebsite",
+    "s3:GetEncryptionConfiguration",
+    "s3:GetLifecycleConfiguration",
+    "s3:GetReplicationConfiguration",
+    "s3:ListBucket",
+  ]
 }
 
 data "aws_iam_policy_document" "terraform_plan" {
@@ -249,32 +281,9 @@ data "aws_iam_policy_document" "terraform_plan" {
     for_each = each.key == "modules/s3-backups" ? [1] : []
 
     content {
-      sid    = "ReadBackupBucketConfig"
-      effect = "Allow"
-      actions = [
-        "s3:GetAccelerateConfiguration",
-        "s3:GetBucketAcl",
-        "s3:GetBucketCORS",
-        "s3:GetBucketLocation",
-        "s3:GetBucketLogging",
-        "s3:GetBucketNotification",
-        "s3:GetBucketObjectLockConfiguration",
-        "s3:GetBucketOwnershipControls",
-        "s3:GetBucketPolicy",
-        "s3:GetBucketPolicyStatus",
-        "s3:GetBucketPublicAccessBlock",
-        "s3:GetBucketRequestPayment",
-        "s3:GetBucketTagging",
-        "s3:GetBucketVersioning",
-        "s3:GetBucketWebsite",
-        "s3:GetEncryptionConfiguration",
-        "s3:GetLifecycleConfiguration",
-        "s3:GetReplicationConfiguration",
-        # Versioning on this bucket is suspended and nothing lists versions, so
-        # s3:ListBucketVersions is gone. s3:ListBucket is kept: it is confined to
-        # this one bucket and costs nothing to carry.
-        "s3:ListBucket",
-      ]
+      sid       = "ReadBackupBucketConfig"
+      effect    = "Allow"
+      actions   = local.s3_bucket_read_actions
       resources = ["arn:aws:s3:::${local.backup_bucket}"]
     }
   }
@@ -333,4 +342,110 @@ resource "aws_iam_role_policy" "terraform_plan" {
   name   = local.plan_role_names[each.key]
   role   = aws_iam_role.terraform_plan[each.key].id
   policy = data.aws_iam_policy_document.terraform_plan[each.key].json
+}
+
+# ---------------------------------------------------------------------------
+# Bootstrap plan role: a reviewable plan for the trust anchor itself.
+#
+# bootstrap/ is plain OpenTofu, applied by hand and never by CI - that is what
+# keeps the trust anchor out of a job that runs contributor-supplied HCL. The
+# cost is that a change to a trust policy, a role or the state bucket used to be
+# reviewed by eye alone. This role buys the plan back: it reads the bootstrap
+# state and the resources declared below, and writes only that state's lock
+# file. It cannot create, change or delete anything, and it deliberately carries
+# no unit credentials - `tofu plan` against bootstrap/ needs no tailnet node, no
+# kubeconfig and no provider tokens.
+#
+# deploy.yaml assumes `terraform-plan-bootstrap`, which is the same family name
+# the unit plan roles use, so the workflow needs no additional variable.
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "terraform_plan_bootstrap" {
+  statement {
+    sid       = "ReadBootstrapState"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/bootstrap/*"]
+  }
+
+  statement {
+    sid       = "ReadStateBucketConfig"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketLocation", "s3:GetBucketVersioning"]
+    resources = [aws_s3_bucket.terraform_state.arn]
+  }
+
+  # Same lock semantics as the unit roles: `tofu plan` takes the state lock even
+  # though it writes nothing else.
+  statement {
+    sid       = "StateLockOnly"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/bootstrap/terraform.tfstate.tflock"]
+  }
+
+  # The bucket resources in state-bucket.tf: bucket, SSE, versioning and the
+  # public access block. Same read set the unit plan roles use for their buckets,
+  # plus s3:ListBucket: the aws_s3_bucket read is a HeadBucket, and a 403 there
+  # makes the provider conclude the bucket has been deleted - which turns the
+  # plan into "create the bucket, replace its three sub-resources" and makes the
+  # review comment lie. The unit roles never refresh a bucket resource, so they
+  # do not need it.
+  statement {
+    sid       = "ReadStateBucketResources"
+    effect    = "Allow"
+    actions   = local.s3_bucket_read_actions
+    resources = [aws_s3_bucket.terraform_state.arn]
+  }
+
+  # Roles and policies are matched by family name rather than by an enumerated
+  # list, so a new unit plan role is plannable without editing this policy. The
+  # wildcard stops at `terraform-`: no other role or policy is readable.
+  statement {
+    sid    = "ReadManagedRoles"
+    effect = "Allow"
+    actions = [
+      "iam:GetRole",
+      "iam:GetRolePolicy",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListRolePolicies",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/terraform-*"]
+  }
+
+  statement {
+    sid    = "ReadManagedPolicies"
+    effect = "Allow"
+    actions = [
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:ListPolicyVersions",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/terraform-*"]
+  }
+
+  statement {
+    sid       = "ReadOidcProvider"
+    effect    = "Allow"
+    actions   = ["iam:GetOpenIDConnectProvider"]
+    resources = [aws_iam_openid_connect_provider.github_actions.arn]
+  }
+}
+
+resource "aws_iam_role" "terraform_plan_bootstrap" {
+  name        = "terraform-plan-bootstrap"
+  description = "Role assumed by GitHub Actions to plan bootstrap/ (read-only, plus its state lock)"
+
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_plan.json
+
+  tags = {
+    ManagedBy = "Terraform"
+    Unit      = "bootstrap"
+  }
+}
+
+resource "aws_iam_role_policy" "terraform_plan_bootstrap" {
+  name   = "terraform-plan-bootstrap"
+  role   = aws_iam_role.terraform_plan_bootstrap.id
+  policy = data.aws_iam_policy_document.terraform_plan_bootstrap.json
 }

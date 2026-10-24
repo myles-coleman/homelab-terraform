@@ -334,3 +334,114 @@ resource "aws_iam_role_policy" "terraform_plan" {
   role   = aws_iam_role.terraform_plan[each.key].id
   policy = data.aws_iam_policy_document.terraform_plan[each.key].json
 }
+
+# ---------------------------------------------------------------------------
+# Bootstrap plan role: a reviewable plan for the trust anchor itself.
+#
+# bootstrap/ is plain OpenTofu, applied by hand and never by CI - that is what
+# keeps the trust anchor out of a job that runs contributor-supplied HCL. The
+# cost is that a change to a trust policy, a role or the state bucket used to be
+# reviewed by eye alone. This role buys the plan back: it reads the bootstrap
+# state and the resources declared below, and writes only that state's lock
+# file. It cannot create, change or delete anything, and it deliberately carries
+# no unit credentials - `tofu plan` against bootstrap/ needs no tailnet node, no
+# kubeconfig and no provider tokens.
+#
+# deploy.yaml assumes `terraform-plan-bootstrap`, which is the same family name
+# the unit plan roles use, so the workflow needs no additional variable.
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "terraform_plan_bootstrap" {
+  statement {
+    sid       = "ReadBootstrapState"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/bootstrap/*"]
+  }
+
+  statement {
+    sid       = "ReadStateBucketConfig"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketLocation", "s3:GetBucketVersioning"]
+    resources = [aws_s3_bucket.terraform_state.arn]
+  }
+
+  # Same lock semantics as the unit roles: `tofu plan` takes the state lock even
+  # though it writes nothing else.
+  statement {
+    sid       = "StateLockOnly"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/bootstrap/terraform.tfstate.tflock"]
+  }
+
+  # The bucket resources in state-bucket.tf: bucket, SSE, versioning and the
+  # public access block. Same read set the unit plan roles use for their buckets.
+  statement {
+    sid    = "ReadStateBucketResources"
+    effect = "Allow"
+    actions = [
+      "s3:GetBucketAcl",
+      "s3:GetBucketLocation",
+      "s3:GetBucketOwnershipControls",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketPolicyStatus",
+      "s3:GetBucketPublicAccessBlock",
+      "s3:GetBucketTagging",
+      "s3:GetBucketVersioning",
+      "s3:GetEncryptionConfiguration",
+    ]
+    resources = [aws_s3_bucket.terraform_state.arn]
+  }
+
+  # Roles and policies are matched by family name rather than by an enumerated
+  # list, so a new unit plan role is plannable without editing this policy. The
+  # wildcard stops at `terraform-`: no other role or policy is readable.
+  statement {
+    sid    = "ReadManagedRoles"
+    effect = "Allow"
+    actions = [
+      "iam:GetRole",
+      "iam:GetRolePolicy",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListRolePolicies",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/terraform-*"]
+  }
+
+  statement {
+    sid    = "ReadManagedPolicies"
+    effect = "Allow"
+    actions = [
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:ListPolicyVersions",
+    ]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/terraform-*"]
+  }
+
+  statement {
+    sid       = "ReadOidcProvider"
+    effect    = "Allow"
+    actions   = ["iam:GetOpenIDConnectProvider"]
+    resources = [aws_iam_openid_connect_provider.github_actions.arn]
+  }
+}
+
+resource "aws_iam_role" "terraform_plan_bootstrap" {
+  name        = "terraform-plan-bootstrap"
+  description = "Role assumed by GitHub Actions to plan bootstrap/ (read-only, plus its state lock)"
+
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_plan.json
+
+  tags = {
+    ManagedBy = "Terraform"
+    Unit      = "bootstrap"
+  }
+}
+
+resource "aws_iam_role_policy" "terraform_plan_bootstrap" {
+  name   = "terraform-plan-bootstrap"
+  role   = aws_iam_role.terraform_plan_bootstrap.id
+  policy = data.aws_iam_policy_document.terraform_plan_bootstrap.json
+}

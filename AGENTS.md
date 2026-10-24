@@ -26,7 +26,9 @@ bad unit does not block the rest.
 
 `bootstrap/` is applied by hand, once, before any unit — it creates the state bucket, the
 GitHub OIDC provider, one read-only plan role per unit, and the administrative apply role that
-everything else assumes. CI deliberately never touches it.
+everything else assumes. CI deliberately never applies it: every push plans it with
+`terraform-plan-bootstrap` and comments the diff on the branch's pull request, and a human runs
+`tofu apply` from the reviewed plan.
 
 ## Commands
 
@@ -73,6 +75,11 @@ variables they need.
 - **discovery job** — `units` in `deploy.yaml`. It lists `modules/*/terragrunt.hcl` from
   `git ls-files` and feeds the validate and plan matrices, so neither has a hand-written unit
   list. Adding a unit directory is enough for CI to validate and plan it.
+- **bootstrap plan** — `plan-bootstrap` in `deploy.yaml`, plus the `bootstrap` job that
+  validates and formats the directory on every run. The trust anchor is planned with
+  `terraform-plan-bootstrap`, which reads `bootstrap/terraform.tfstate` and the
+  `terraform-*` roles and policies and writes only that state's lock. It holds no unit
+  credentials and no tailnet node. Applying `bootstrap/` is still a hand-run step.
 
 ## Boundaries
 
@@ -97,7 +104,9 @@ variables they need.
   by the discovery job automatically, but it also needs an entry in `local.plan_units` in
   `bootstrap/oidc.tf` and a `bootstrap/` apply by hand: until its plan role exists, its plan
   fails to assume anything.
-- Replacing the state bucket or the GitHub OIDC role in `bootstrap/`.
+- Replacing the state bucket or the GitHub OIDC role in `bootstrap/`. Any change there gets a
+  plan on the branch's pull request; apply it by hand, from that plan, before merging anything
+  that depends on it.
 - Anything that moves the `10.0.0.99` load-balancer IP or the `argocd.cowlab.org`,
   `signoz.cowlab.org`, and `dex.cowlab.org` hostnames — the cluster repo depends on them.
 

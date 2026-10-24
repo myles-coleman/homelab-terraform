@@ -14,18 +14,24 @@ on:
       - "**"
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
+    # bootstrap/** is here so a trust-anchor change gets a plan, even though CI
+    # never applies it.
     paths:
       - "root.hcl"
       - "common-inputs.yaml"
+      - "bootstrap/**"
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"
   pull_request:
     # root.hcl and common-inputs.yaml are read by every unit through
     # find_in_parent_folders, so a change to either can affect all of them.
+    # bootstrap/** is here so a trust-anchor change gets a plan, even though CI
+    # never applies it.
     paths:
       - "root.hcl"
       - "common-inputs.yaml"
+      - "bootstrap/**"
       - "modules/**"
       - "scripts/**"
       - ".github/workflows/**"
@@ -82,6 +88,37 @@ jobs:
           fi
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
           jq -r '.include[].module' <<<"${matrix}"
+
+  # bootstrap/ is plain OpenTofu: no Terragrunt unit, applied by hand, never by
+  # CI. A syntax or format regression there is still worth catching on the pull
+  # request, so this job validates it with no credentials and a backend-less
+  # init. The credentialed half is `plan-bootstrap` below.
+  bootstrap:
+    name: Bootstrap (format, validate)
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      # `tofu` only: this job must not drag Terragrunt in, because bootstrap/ has
+      # no terragrunt.hcl to run.
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.tofu_version }}
+          tofu_wrapper: false
+
+      - name: Terraform Format
+        run: tofu fmt -check -recursive
+        working-directory: ./bootstrap
+
+      - name: Validate
+        run: |
+          tofu init -backend=false -input=false
+          tofu validate -no-color
+        working-directory: ./bootstrap
 
   # Pull-request entry point. Nothing here can reach the account: no `id-token`,
   # no `secrets`, no `vars` beyond the tool versions. The placeholder values
@@ -292,6 +329,118 @@ jobs:
         run: |
           # A stable marker lets a later push rewrite this module's comment
           # rather than posting another copy.
+          marker="<!-- terraform-plan: ${MODULE} -->"
+          body="$(printf '%s\n%s' "${marker}" "${PLAN_BODY}")"
+          existing="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"${marker}\")) | .id" \
+            | tail -n 1)"
+          if [ -n "${existing}" ]; then
+            printf '%s' "${body}" \
+              | gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+                  -F body=@- > /dev/null
+            echo "Updated plan comment ${existing} for ${MODULE}"
+          else
+            printf '%s' "${body}" \
+              | gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+                  -F body=@- > /dev/null
+            echo "Created plan comment for ${MODULE}"
+          fi
+
+  # The trust anchor gets a plan too (#18). bootstrap/ declares the state bucket
+  # and every role these jobs assume, and it is applied by hand - so a change to
+  # a trust policy used to be reviewed by eye alone. This produces that plan on
+  # the same push trigger as the unit plans and comments it on the branch's pull
+  # request, exactly like a unit.
+  #
+  # The identity, `terraform-plan-bootstrap`, reads bootstrap state and the
+  # resources bootstrap manages and writes only that state's lock. It also holds
+  # no unit credentials - no Cloudflare or SigNoz tokens, no tailnet node, no
+  # kubeconfig - because `tofu plan` there needs none of them. Applying
+  # bootstrap/ stays a deliberate hand-run step.
+  plan-bootstrap:
+    name: Plan (bootstrap)
+    if: github.event_name != 'pull_request'
+    needs: bootstrap
+    permissions:
+      contents: read
+      id-token: write
+      # Posting and rewriting the plan comment on the branch's pull request.
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 #v5.1.0
+        with:
+          # Same family prefix as the unit roles; bootstrap is just another leaf.
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}-bootstrap
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.tofu_version }}
+          tofu_wrapper: false
+
+      - name: Terraform Format
+        run: tofu fmt -check -recursive
+        working-directory: ./bootstrap
+
+      - name: OpenTofu Plan
+        env:
+          TF_IN_AUTOMATION: true
+        run: |
+          tofu init -input=false -no-color
+          tofu plan -input=false -no-color -out=tfplan.tfplan
+          tofu show -json tfplan.tfplan > tfplan.json
+        working-directory: ./bootstrap
+
+      - name: Find the pull request for this branch
+        id: pull-request
+        if: github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number="$(gh pr list --head "${GITHUB_REF_NAME}" --state open \
+            --json number --limit 1 --jq '.[0].number // empty')"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Check the plan has changes
+        id: changes
+        run: |
+          if jq -e '[.resource_changes[]? | select(.change.actions != ["no-op"])] | length > 0' \
+            "bootstrap/tfplan.json" > /dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Render Plan Changes
+        id: plan-comment
+        uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
+        with:
+          json-file: ./bootstrap/tfplan.json
+          comment-header: "Terraform Plan for bootstrap"
+          expand-comment: 'true'
+          hide-previous-comments: 'true'
+          log-changed-resources: 'false'
+          include-workflow-link: 'true'
+          quiet: 'true'
+
+      - name: Post Plan Changes
+        if: steps.pull-request.outputs.number != '' && steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pull-request.outputs.number }}
+          MODULE: bootstrap
+          PLAN_BODY: ${{ steps.plan-comment.outputs.comment-body }}
+        run: |
+          # Same stable marker as the unit comments, so a later push rewrites
+          # this comment instead of stacking another copy.
           marker="<!-- terraform-plan: ${MODULE} -->"
           body="$(printf '%s\n%s' "${marker}" "${PLAN_BODY}")"
           existing="$(gh api --paginate \

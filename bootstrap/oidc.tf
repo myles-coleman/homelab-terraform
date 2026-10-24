@@ -201,6 +201,38 @@ locals {
   backup_bucket     = "myles-homelab-backups"
   backup_iam_user   = "homelab-k3s-cluster-longhorn-backup-user"
   backup_iam_policy = "homelab-k3s-cluster-longhorn-backup-policy"
+
+  # The metadata reads the aws_s3_bucket* resources perform on refresh, scoped to
+  # one bucket each. The provider reads more than any single resource needs -
+  # CORS, accelerate and request payment among them - so this is the union, and
+  # it is what a plan of modules/s3-backups exercises on every run.
+  #
+  # s3:ListBucket is included because the aws_s3_bucket read is a HeadBucket, and
+  # a 403 there makes the provider report the bucket as deleted (which turns a
+  # plan into "create the bucket, replace its sub-resources", not an error).
+  # s3:ListBucketVersions is not: versioning is disabled or suspended here and
+  # nothing lists versions.
+  s3_bucket_read_actions = [
+    "s3:GetAccelerateConfiguration",
+    "s3:GetBucketAcl",
+    "s3:GetBucketCORS",
+    "s3:GetBucketLocation",
+    "s3:GetBucketLogging",
+    "s3:GetBucketNotification",
+    "s3:GetBucketObjectLockConfiguration",
+    "s3:GetBucketOwnershipControls",
+    "s3:GetBucketPolicy",
+    "s3:GetBucketPolicyStatus",
+    "s3:GetBucketPublicAccessBlock",
+    "s3:GetBucketRequestPayment",
+    "s3:GetBucketTagging",
+    "s3:GetBucketVersioning",
+    "s3:GetBucketWebsite",
+    "s3:GetEncryptionConfiguration",
+    "s3:GetLifecycleConfiguration",
+    "s3:GetReplicationConfiguration",
+    "s3:ListBucket",
+  ]
 }
 
 data "aws_iam_policy_document" "terraform_plan" {
@@ -249,32 +281,9 @@ data "aws_iam_policy_document" "terraform_plan" {
     for_each = each.key == "modules/s3-backups" ? [1] : []
 
     content {
-      sid    = "ReadBackupBucketConfig"
-      effect = "Allow"
-      actions = [
-        "s3:GetAccelerateConfiguration",
-        "s3:GetBucketAcl",
-        "s3:GetBucketCORS",
-        "s3:GetBucketLocation",
-        "s3:GetBucketLogging",
-        "s3:GetBucketNotification",
-        "s3:GetBucketObjectLockConfiguration",
-        "s3:GetBucketOwnershipControls",
-        "s3:GetBucketPolicy",
-        "s3:GetBucketPolicyStatus",
-        "s3:GetBucketPublicAccessBlock",
-        "s3:GetBucketRequestPayment",
-        "s3:GetBucketTagging",
-        "s3:GetBucketVersioning",
-        "s3:GetBucketWebsite",
-        "s3:GetEncryptionConfiguration",
-        "s3:GetLifecycleConfiguration",
-        "s3:GetReplicationConfiguration",
-        # Versioning on this bucket is suspended and nothing lists versions, so
-        # s3:ListBucketVersions is gone. s3:ListBucket is kept: it is confined to
-        # this one bucket and costs nothing to carry.
-        "s3:ListBucket",
-      ]
+      sid       = "ReadBackupBucketConfig"
+      effect    = "Allow"
+      actions   = local.s3_bucket_read_actions
       resources = ["arn:aws:s3:::${local.backup_bucket}"]
     }
   }
@@ -383,20 +392,9 @@ data "aws_iam_policy_document" "terraform_plan_bootstrap" {
   # review comment lie. The unit roles never refresh a bucket resource, so they
   # do not need it.
   statement {
-    sid    = "ReadStateBucketResources"
-    effect = "Allow"
-    actions = [
-      "s3:ListBucket",
-      "s3:GetBucketAcl",
-      "s3:GetBucketLocation",
-      "s3:GetBucketOwnershipControls",
-      "s3:GetBucketPolicy",
-      "s3:GetBucketPolicyStatus",
-      "s3:GetBucketPublicAccessBlock",
-      "s3:GetBucketTagging",
-      "s3:GetBucketVersioning",
-      "s3:GetEncryptionConfiguration",
-    ]
+    sid       = "ReadStateBucketResources"
+    effect    = "Allow"
+    actions   = local.s3_bucket_read_actions
     resources = [aws_s3_bucket.terraform_state.arn]
   }
 

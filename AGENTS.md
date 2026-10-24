@@ -8,7 +8,7 @@ root that manages homelab infrastructure for `cowlab.org`.
 ```
 root.hcl                       # shared Terragrunt root: OpenTofu binary + S3 remote state
 common-inputs.yaml             # shared inputs read by every unit
-bootstrap/                     # plain Terraform, not Terragrunt: S3 state bucket + GitHub OIDC role
+bootstrap/                     # plain Terraform, not Terragrunt: state bucket, OIDC provider, roles
 modules/terragrunt.hcl         # include-only stub; every unit reaches root.hcl through it
 modules/cloudflare/            # DNS records, zone, tunnel, Access
 modules/argocd-install/        # ArgoCD Helm install
@@ -24,8 +24,9 @@ Each directory under `modules/` is its own unit with its own state key
 (`${path_relative_to_include()}/terraform.tfstate`), so units apply independently and one
 bad unit does not block the rest.
 
-`bootstrap/` is applied by hand, once, before any unit — it creates the state bucket and the
-GitHub Actions OIDC role that everything else assumes. CI deliberately never touches it.
+`bootstrap/` is applied by hand, once, before any unit — it creates the state bucket, the
+GitHub OIDC provider, one read-only plan role per unit, and the administrative apply role that
+everything else assumes. CI deliberately never touches it.
 
 ## Commands
 
@@ -60,9 +61,14 @@ variables they need.
 - **`--all`** — Terragrunt flag that fans a command out to every descendant unit.
 - **`environment: deploy`** — the GitHub environment gating the apply job; applying to `main`
   goes through it, not through a local run.
-- **plan trust anchor** — the plan role trusts only the `ref:refs/heads/*` OIDC subject, which
+- **plan trust anchor** — the plan roles trust only the `ref:refs/heads/*` OIDC subject, which
   only a push to a branch of this repository can present; `pull_request` runs get no AWS
   credentials at all.
+- **plan role** — one per unit, `terraform-plan-<plan_role>`, so a plan can read only its own
+  unit's state prefix and write only that unit's `*.tflock`. `AWS_PLAN_ROLE_ARN` is the family
+  prefix `arn:aws:iam::<account>:role/terraform-plan`; the plan matrix in `deploy.yaml` carries
+  the rest as `plan_role`, the unit path with `/` flattened to `-`. The roles themselves are
+  declared in `bootstrap/oidc.tf`'s `local.plan_units`, not in a repository variable.
 
 ## Boundaries
 
@@ -82,8 +88,10 @@ variables they need.
 
 - Changing `root.hcl`, or any `_backend.tf` state-backend configuration. Altering the bucket,
   key pattern, or region can orphan or split state.
-- Adding a unit. It needs a `terragrunt.hcl`, a non-colliding state key, and an entry in both
-  the `validate` and `plan` matrices in `deploy.yaml`.
+- Adding a unit. It needs a `terragrunt.hcl`, a non-colliding state key, an entry in both
+  the `validate` and `plan` matrices in `deploy.yaml`, and an entry in `local.plan_units` in
+  `bootstrap/oidc.tf` — then `bootstrap/` has to be applied again by hand, because the unit
+  has no plan role until it is.
 - Replacing the state bucket or the GitHub OIDC role in `bootstrap/`.
 - Anything that moves the `10.0.0.99` load-balancer IP or the `argocd.cowlab.org`,
   `signoz.cowlab.org`, and `dex.cowlab.org` hostnames — the cluster repo depends on them.

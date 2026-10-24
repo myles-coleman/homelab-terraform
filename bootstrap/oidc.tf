@@ -154,107 +154,183 @@ resource "aws_iam_role_policy_attachment" "terraform_admin" {
 }
 
 # ---------------------------------------------------------------------------
-# Plan role: everything the plan job needs to read state and diff the modules,
-# with no write access outside the state lock. Kept separate from the apply role
-# so a plan run never holds AdministratorAccess.
+# Plan roles: one per unit, so a credentialed plan can read only the state it is
+# planning and write only the one lock file it needs. Kept separate from the
+# apply role so a plan run never holds AdministratorAccess.
+#
+# A unit's state key is `${path_relative_to_include()}/terraform.tfstate`
+# (root.hcl), so the unit path is also the S3 prefix that scopes it. The role
+# name drops the `modules/` segment and flattens the rest, which is the
+# `plan_role` the plan matrix in deploy.yaml carries, e.g.
+# modules/signoz-dashboards/pi5-thermal plans as
+# terraform-plan-signoz-dashboards-pi5-thermal. deploy.yaml composes those ARNs
+# from the AWS_PLAN_ROLE_ARN family prefix, so adding a unit here and to the
+# matrix is enough - there is no per-unit repository variable.
 # ---------------------------------------------------------------------------
 
-data "aws_iam_policy_document" "terraform_plan" {
-  statement {
-    sid       = "ReadState"
-    effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:GetObjectVersion"]
-    resources = ["${aws_s3_bucket.terraform_state.arn}/*"]
+data "aws_caller_identity" "current" {}
+
+locals {
+  # Keep in sync with the plan matrix in .github/workflows/deploy.yaml. A unit
+  # missing here has no role to assume, so its plan fails rather than falling
+  # back to a broader identity.
+  plan_units = toset([
+    "modules/argocd-configure",
+    "modules/argocd-install",
+    "modules/cloudflare",
+    "modules/s3-backups",
+    "modules/signoz-dashboards/homelab-overview",
+    "modules/signoz-dashboards/network-speeds",
+    "modules/signoz-dashboards/pi5-thermal",
+  ])
+
+  # Role names drop the `modules/` segment and flatten the rest, which is the
+  # same `plan_role` the plan matrix in deploy.yaml carries. GitHub workflow
+  # expressions have no `replace()`, so that value cannot be computed there; this
+  # local and the matrix are the pair that has to stay in step.
+  plan_role_names = {
+    for unit in local.plan_units :
+    unit => "terraform-plan-${replace(trimprefix(unit, "modules/"), "/", "-")}"
   }
 
+  # What modules/s3-backups creates, spelled out here because bootstrap cannot
+  # read that unit's inputs. Drift is loud, not silent: a rename in the unit
+  # turns into AccessDenied on its next plan. Keep in sync with bucket_name in
+  # modules/s3-backups/terragrunt.hcl and the `${cluster_name}-...` names in
+  # modules/s3-backups/policy.tf.
+  backup_bucket     = "myles-homelab-backups"
+  backup_iam_user   = "homelab-k3s-cluster-longhorn-backup-user"
+  backup_iam_policy = "homelab-k3s-cluster-longhorn-backup-policy"
+}
+
+data "aws_iam_policy_document" "terraform_plan" {
+  for_each = local.plan_units
+
+  # Object reads stop at the unit's own prefix. Before this split every plan
+  # could read every other unit's state, which holds the tunnel secret, the
+  # ArgoCD SSO client secret and the Longhorn access key.
   statement {
-    sid       = "ListStateBucket"
+    sid       = "ReadUnitState"
     effect    = "Allow"
-    actions   = ["s3:ListBucket", "s3:GetBucketLocation", "s3:GetBucketVersioning"]
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/${each.key}/*"]
+  }
+
+  # Bucket-level reads take no key or prefix, and they return metadata rather
+  # than object bodies, so they stay on the bucket itself. s3:ListBucket is not
+  # granted: the backend addresses its state and lock by exact key.
+  statement {
+    sid    = "ReadStateBucketConfig"
+    effect = "Allow"
+    actions = [
+      "s3:GetBucketLocation",
+      "s3:GetBucketVersioning",
+    ]
     resources = [aws_s3_bucket.terraform_state.arn]
   }
 
-  # `use_lockfile = true` in root.hcl makes OpenTofu take a lock by writing
-  # `<key>.tflock` and delete it on release. This is the only write the plan
-  # role gets, and only under that suffix.
+  # `use_lockfile = true` in root.hcl takes the lock by writing
+  # `<key>.tflock` and deleting it on release. This is the only write a plan role
+  # gets, and only for its own unit's lock.
   statement {
     sid       = "StateLockOnly"
     effect    = "Allow"
     actions   = ["s3:PutObject", "s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.terraform_state.arn}/*.tflock"]
+    resources = ["${aws_s3_bucket.terraform_state.arn}/${each.key}/terraform.tfstate.tflock"]
   }
 
-  # modules/s3-backups plans against this bucket and its IAM user. Keep the name
-  # in sync with bucket_name in modules/s3-backups/terragrunt.hcl.
-  statement {
-    sid    = "ReadBackupBucketConfig"
-    effect = "Allow"
-    actions = [
-      "s3:GetAccelerateConfiguration",
-      "s3:GetBucketAcl",
-      "s3:GetBucketCORS",
-      "s3:GetBucketLocation",
-      "s3:GetBucketLogging",
-      "s3:GetBucketNotification",
-      "s3:GetBucketObjectLockConfiguration",
-      "s3:GetBucketOwnershipControls",
-      "s3:GetBucketPolicy",
-      "s3:GetBucketPolicyStatus",
-      "s3:GetBucketPublicAccessBlock",
-      "s3:GetBucketRequestPayment",
-      "s3:GetBucketTagging",
-      "s3:GetBucketVersioning",
-      "s3:GetBucketWebsite",
-      "s3:GetEncryptionConfiguration",
-      "s3:GetLifecycleConfiguration",
-      "s3:GetReplicationConfiguration",
-      "s3:ListBucket",
-      "s3:ListBucketVersions",
-    ]
-    resources = ["arn:aws:s3:::myles-homelab-backups"]
+  # -------------------------------------------------------------------------
+  # modules/s3-backups is the only unit that talks to AWS, and its refresh needs
+  # the backup bucket's configuration and that one user and policy. Everything
+  # below is attached to its role alone rather than to all seven.
+  # -------------------------------------------------------------------------
+
+  dynamic "statement" {
+    for_each = each.key == "modules/s3-backups" ? [1] : []
+
+    content {
+      sid    = "ReadBackupBucketConfig"
+      effect = "Allow"
+      actions = [
+        "s3:GetAccelerateConfiguration",
+        "s3:GetBucketAcl",
+        "s3:GetBucketCORS",
+        "s3:GetBucketLocation",
+        "s3:GetBucketLogging",
+        "s3:GetBucketNotification",
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:GetBucketOwnershipControls",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketPolicyStatus",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketTagging",
+        "s3:GetBucketVersioning",
+        "s3:GetBucketWebsite",
+        "s3:GetEncryptionConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:GetReplicationConfiguration",
+        # Versioning on this bucket is suspended and nothing lists versions, so
+        # s3:ListBucketVersions is gone. s3:ListBucket is kept: it is confined to
+        # this one bucket and costs nothing to carry.
+        "s3:ListBucket",
+      ]
+      resources = ["arn:aws:s3:::${local.backup_bucket}"]
+    }
   }
 
-  statement {
-    sid    = "ReadBackupIam"
-    effect = "Allow"
-    actions = [
-      "iam:GetAccessKeyLastUsed",
-      "iam:GetPolicy",
-      "iam:GetPolicyVersion",
-      "iam:GetUser",
-      "iam:GetUserPolicy",
-      "iam:ListAccessKeys",
-      "iam:ListAttachedUserPolicies",
-      "iam:ListPolicies",
-      "iam:ListPolicyVersions",
-      "iam:ListUserPolicies",
-      "iam:ListUsers",
-    ]
-    resources = ["*"]
+  dynamic "statement" {
+    for_each = each.key == "modules/s3-backups" ? [1] : []
+
+    content {
+      sid    = "ReadBackupIamUser"
+      effect = "Allow"
+      actions = [
+        "iam:GetUser",
+        "iam:ListAccessKeys",
+        "iam:ListAttachedUserPolicies",
+      ]
+      resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/${local.backup_iam_user}"]
+    }
   }
-}
 
-resource "aws_iam_policy" "terraform_plan" {
-  name        = "terraform-plan-read"
-  description = "Read-only access for GitHub Actions Terraform plan runs, plus the state lock"
-  policy      = data.aws_iam_policy_document.terraform_plan.json
+  dynamic "statement" {
+    for_each = each.key == "modules/s3-backups" ? [1] : []
 
-  tags = {
-    ManagedBy = "Terraform"
+    content {
+      sid    = "ReadBackupIamPolicy"
+      effect = "Allow"
+      actions = [
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListPolicyVersions",
+      ]
+      resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${local.backup_iam_policy}"]
+    }
   }
 }
 
 resource "aws_iam_role" "terraform_plan" {
-  name               = "terraform-plan"
-  description        = "Role assumed by GitHub Actions to plan Terraform changes"
+  for_each = local.plan_units
+
+  name        = local.plan_role_names[each.key]
+  description = "Role assumed by GitHub Actions to plan ${each.key}"
+
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_plan.json
 
   tags = {
     ManagedBy = "Terraform"
+    Unit      = replace(trimprefix(each.key, "modules/"), "/", "-")
   }
 }
 
-resource "aws_iam_role_policy_attachment" "terraform_plan" {
-  role       = aws_iam_role.terraform_plan.name
-  policy_arn = aws_iam_policy.terraform_plan.arn
+# Inline rather than a managed policy per role: each document is attached to
+# exactly one role and dies with it, so there is nothing to reuse and nothing to
+# leave behind when a unit is removed.
+resource "aws_iam_role_policy" "terraform_plan" {
+  for_each = local.plan_units
+
+  name   = local.plan_role_names[each.key]
+  role   = aws_iam_role.terraform_plan[each.key].id
+  policy = data.aws_iam_policy_document.terraform_plan[each.key].json
 }

@@ -61,8 +61,12 @@ variables they need.
 - **generated file** — `_backend.tf` / `_provider.tf`, rewritten by Terragrunt on every run
   and gitignored: it is build output, not source.
 - **`--all`** — Terragrunt flag that fans a command out to every descendant unit.
-- **`environment: deploy`** — the GitHub environment gating the apply job; applying to `main`
-  goes through it, not through a local run.
+- **`environment: deploy`** — the GitHub environment on the apply job. It carries one
+  protection rule, a branch policy limited to `main`, and **no required reviewers**: this
+  repository's plan does not support that rule, and enabling it is an account upgrade, not a
+  repository change. So it bounds *where* an apply can come from; it is not an approval.
+  The plan comment on the pull request is the review, and `main` applies automatically once
+  it plans.
 - **plan trust anchor** — the plan roles trust only the `ref:refs/heads/*` OIDC subject, which
   only a push to a branch of this repository can present; `pull_request` runs get no AWS
   credentials at all.
@@ -126,7 +130,9 @@ variables they need.
 - Never let a `pull_request` run hold AWS credentials. Its OIDC subject is
   `repo:<owner>/<repo>:pull_request` whether the head branch is in this repository or a fork,
   so it cannot express "same repository only"; the plan role trusts `ref:refs/heads/*` instead.
-- Never bypass the `deploy` environment's approval to force an apply.
+- Never treat the `deploy` environment as an approval step. It has no required reviewers, so
+  merging to `main` *is* the decision to apply, and the plan comment on the pull request is
+  the only thing that will ever ask you to look. Read it before you merge; nothing asks again.
 
 ## Generated / Do-Not-Touch Paths
 

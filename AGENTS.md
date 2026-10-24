@@ -129,6 +129,10 @@ a generated file. Change the generating block and the next run produces the new 
   `SIGNOZ_ENDPOINT`, `SIGNOZ_ACCESS_TOKEN`, and `KUBECONFIG` (base64, `argocd-*` units only).
 - In CI these come from GitHub Actions secrets and variables; locally, export them in the
   shell. Never write a value into a `.tf`, `.hcl`, or `.yaml` file.
+- `ALLOWED_EMAILS` is a repository **secret**, not a variable, and it is the only input to the
+  Cloudflare Access allow policy. `modules/cloudflare/_variables.tf` rejects an empty or
+  malformed list at plan time, so deleting the secret fails the plan instead of applying a
+  policy that admits nobody — do not relax that validation to make a plan pass.
 - `SIGNOZ_ACCESS_TOKEN` and `CLOUDFLARE_API_TOKEN` are read by their providers directly from
   the environment, so they stay out of `_provider.tf` and Terraform state. Keep it that way:
   the generated provider blocks are `provider "cloudflare" {}` and

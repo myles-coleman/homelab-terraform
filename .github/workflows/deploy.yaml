@@ -203,12 +203,20 @@ jobs:
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
-      # The tailscale unit manages the tailnet policy file and the CI OAuth
-      # clients. Its provider reads these two environment names itself, so the
-      # secrets are named for what they authorise: TS_TF_* is the management
-      # credential, distinct from the TS_OAUTH_* pair that mints runner nodes.
+      # The tailscale unit owns the tailnet policy file. Its provider reads these
+      # two environment names itself, so the secrets are named for what they
+      # authorise: TS_TF_* is the management credential, distinct from the
+      # TS_OAUTH_* pair that mints runner nodes and the TS_PLAN_OAUTH_* pair the
+      # plan jobs use.
       TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
       TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
+      # Some units talk only to public endpoints - Cloudflare's API, Google's
+      # OAuth endpoints, AWS, api.tailscale.com - so their plan gets no tailnet
+      # node and no resolver surgery. Everything else reaches 10.0.0.200:6443
+      # (the kube API) or 10.0.0.99 through *.cowlab.org, which is only routable
+      # over the tailnet. A unit missing from this list keeps the node: the
+      # default is the safe one, so a public-only unit has to be added here.
+      NEEDS_TAILNET: ${{ !contains(fromJSON('["cloudflare","s3-backups","tailscale"]'), matrix.module) }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -235,12 +243,19 @@ jobs:
       # keeps tailscaled out of DNS entirely: nothing here needs MagicDNS, since
       # the kubeconfig dials the kube-vip IP 10.0.0.200:6443 and every other name
       # is public *.cowlab.org resolved over the route.
+      #
+      # `tag:ci-plan` is a separate tag from the one apply and smoke use, so a
+      # branch plan does not sit in the deploy tag's tailnet policy position
+      # (#15). The tag has to be authorized on the OAuth client and granted in
+      # the tailnet policy; without both this step fails, and because `apply`
+      # needs `plan`, so does every deploy.
       - name: Tailscale
+        if: env.NEEDS_TAILNET == 'true'
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          tags: tag:ci-plan
           args: "--accept-dns=false"
 
       # Accepting Tailscale routes breaks systemd-resolved, whose 127.0.0.53 stub
@@ -251,6 +266,7 @@ jobs:
       # i/o timeout". Drop the stub resolver, install a plain file nothing can
       # revert, then fail fast instead of burning minutes in provider retries.
       - name: Fix DNS resolution
+        if: env.NEEDS_TAILNET == 'true'
         run: |
           sudo systemctl disable --now systemd-resolved 2>/dev/null || true
           sudo rm -f /etc/resolv.conf

@@ -182,6 +182,7 @@ locals {
     "modules/signoz-dashboards/homelab-overview",
     "modules/signoz-dashboards/network-speeds",
     "modules/signoz-dashboards/pi5-thermal",
+    "modules/tailscale",
   ])
 
   # Role names drop the `modules/` segment and flatten the rest, which is the

@@ -141,6 +141,8 @@ jobs:
       ALLOWED_EMAILS: "nobody@example.invalid"
       SIGNOZ_ENDPOINT: "https://signoz.invalid"
       SIGNOZ_ACCESS_TOKEN: "placeholder"
+      TAILSCALE_OAUTH_CLIENT_ID: "placeholder"
+      TAILSCALE_OAUTH_CLIENT_SECRET: "placeholder"
       # `terragrunt validate` initialises first; without this it would talk to
       # the S3 backend and need AWS credentials, which pull requests never get.
       TF_CLI_ARGS_init: "-backend=false"
@@ -201,6 +203,12 @@ jobs:
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
+      # The tailscale unit manages the tailnet policy file and the CI OAuth
+      # clients. Its provider reads these two environment names itself, so the
+      # secrets are named for what they authorise: TS_TF_* is the management
+      # credential, distinct from the TS_OAUTH_* pair that mints runner nodes.
+      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
+      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -479,6 +487,12 @@ jobs:
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
+      # The tailscale unit manages the tailnet policy file and the CI OAuth
+      # clients. Its provider reads these two environment names itself, so the
+      # secrets are named for what they authorise: TS_TF_* is the management
+      # credential, distinct from the TS_OAUTH_* pair that mints runner nodes.
+      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
+      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1

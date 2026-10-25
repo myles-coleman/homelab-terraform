@@ -24,6 +24,18 @@ A Tailscale trust credential, read by the provider from the environment:
 | Variable | Purpose |
 | --- | --- |
 | `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET` | OAuth client scopes: `policy_file`, `devices:core:read` and `devices:posture_attributes` (the last two are required by `policy_file`), plus `oauth_keys` if this unit is to own the CI client's tags |
+
+Those two environment names are what the provider reads, so CI maps the
+repository secrets into them:
+
+```yaml
+TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
+TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
+```
+
+`TS_TF_*` is the management credential Terraform authenticates with; it is a
+different credential from `TS_OAUTH_CLIENT_ID`/`TS_OAUTH_SECRET`, which mint
+runner nodes during a plan or apply.
 | `TAILSCALE_API_KEY` | alternative to the pair above, a personal API key — not recommended |
 
 In CI these are repository secrets of the same names; locally, export them. The

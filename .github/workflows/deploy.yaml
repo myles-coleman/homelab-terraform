@@ -204,9 +204,11 @@ jobs:
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
       # The tailscale unit manages the tailnet policy file and the CI OAuth
-      # clients. Its provider reads these two names by itself.
-      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+      # clients. Its provider reads these two environment names itself, so the
+      # secrets are named for what they authorise: TS_TF_* is the management
+      # credential, distinct from the TS_OAUTH_* pair that mints runner nodes.
+      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
+      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -486,9 +488,11 @@ jobs:
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
       # The tailscale unit manages the tailnet policy file and the CI OAuth
-      # clients. Its provider reads these two names by itself.
-      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+      # clients. Its provider reads these two environment names itself, so the
+      # secrets are named for what they authorise: TS_TF_* is the management
+      # credential, distinct from the TS_OAUTH_* pair that mints runner nodes.
+      TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.TS_TF_OAUTH_CLIENT_ID }}
+      TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1

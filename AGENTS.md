@@ -70,8 +70,10 @@ variables they need.
   it plans.
 - **tailnet policy** — the Tailscale policy file (grants, `tagOwners`, hosts) in
   `modules/tailscale/tailnet.hujson`, imported from the admin console and now authoritative:
-  a change to tailnet access is a diff here, not a click there. See that unit's README for the
-  two `tailscale_acl` defaults that stop a mistaken apply from clobbering it.
+  a change to tailnet access is a diff here, not a click there. Trust credentials stay in the
+  console — a node may only ask for exactly its credential's tags, so there is one credential
+  per trust domain and Terraform does not manage them. See that unit's README for the two
+  `tailscale_acl` defaults that stop a mistaken apply from clobbering it.
 - **plan trust anchor** — the plan roles trust only the `ref:refs/heads/*` OIDC subject, which
   only a push to a branch of this repository can present; `pull_request` runs get no AWS
   credentials at all.

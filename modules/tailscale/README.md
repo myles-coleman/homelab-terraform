@@ -17,10 +17,19 @@ This unit owns the policy file (`tailscale_acl.this` -> `tailnet.hujson`). The
 file was imported from the admin console verbatim, so the first apply after the
 import was a no-op apart from the intended `tag:ci-plan` addition.
 
-Still in the console, for now: which tags the CI OAuth client may mint. Managing
-that means importing the client (`tailscale_oauth_client`), which needs its live
-scope list to avoid silently rewriting the credential — a follow-up, tracked in
-#15.
+Trust credentials are **not** managed here. Two reasons, both learned the hard
+way:
+
+- A node may only ask for tags that match its credential's tag list exactly, so
+  a credential per trust domain (`tag:ci` for apply, `tag:ci-plan` for plan) is
+  the shape that works — and that is identity, not policy.
+- Creating or updating an OAuth client through Terraform needs the management
+  credential to hold `auth_keys`/`oauth_keys` itself, and the client secret ends
+  up in state. Neither is worth it: the credential is created once in the console
+  and rotated there.
+
+So the split is: the policy file is reviewed in this repository, the credentials
+that authenticate against it live in the admin console and in GitHub secrets.
 
 ## Credentials
 
@@ -28,7 +37,7 @@ A Tailscale trust credential, read by the provider from the environment:
 
 | Variable | Purpose |
 | --- | --- |
-| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET` | OAuth client scopes: `policy_file`, `devices:core:read` and `devices:posture_attributes` (the last two are required by `policy_file`), plus `oauth_keys` if this unit is to own the CI client's tags |
+| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET` | a trust credential scoped to `policy_file`, `devices:core:read` and `devices:posture_attributes` (the last two are required by `policy_file`). It needs no `auth_keys`, no `oauth_keys` and no tags: this unit writes policy, never credentials or nodes. |
 
 Those two environment names are what the provider reads, so CI maps the
 repository secrets into them:

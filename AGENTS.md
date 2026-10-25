@@ -112,7 +112,11 @@ variables they need.
 - Adding a unit. A directory with a `terragrunt.hcl` and a non-colliding state key is picked up
   by the discovery job automatically, but it also needs an entry in `local.plan_units` in
   `bootstrap/oidc.tf` and a `bootstrap/` apply by hand: until its plan role exists, its plan
-  fails to assume anything.
+  fails to assume anything. Its state object also has to exist before CI can plan it — plan
+  roles are scoped to object keys and hold no `s3:ListBucket`, and S3 answers a *missing* key
+  with `403 Forbidden` rather than `404` for a caller in that position, which surfaces as
+  `Error refreshing state: HeadObject ... Forbidden` from `tofu init`. So the first
+  `terragrunt apply` for a new unit runs locally, and CI takes over from the second run.
 - Replacing the state bucket or the GitHub OIDC role in `bootstrap/`. Any change there gets a
   plan on the branch's pull request; apply it by hand, from that plan, before merging anything
   that depends on it.

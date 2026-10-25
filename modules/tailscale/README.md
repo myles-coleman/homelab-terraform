@@ -30,6 +30,14 @@ In CI these are repository secrets of the same names; locally, export them. The
 generated `_provider.tf` deliberately contains no credential: a generate block is
 rewritten on every run and would otherwise become a file waiting to be committed.
 
+## First apply
+
+This unit is new, so it has no state object yet, and a plan role cannot create
+one: the role is scoped to object keys and holds no `s3:ListBucket`, which makes
+S3 answer a missing key with `403` instead of `404`. Run the first
+`terragrunt apply` from a workstation with the credential exported, and CI plans
+every run after that. Same rule as adding any unit, recorded in `AGENTS.md`.
+
 ## Taking ownership of the policy file
 
 The resource is `tailscale_acl`, which manages the **whole** policy file. Two of

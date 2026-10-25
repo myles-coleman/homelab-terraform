@@ -1,0 +1,84 @@
+{
+	"groups": {
+		"group:admin": ["mylescoleman05@gmail.com"],
+	},
+	"tagOwners": {
+		"tag:ci":             ["group:admin"],
+		"tag:ci-plan":        ["group:admin"],
+		"tag:server":         ["group:admin"],
+		"tag:infrastructure": ["group:admin"],
+		"tag:sandbox":        ["group:admin"],
+	},
+	"acls": [
+		// 1. Allow admins to access all Tailscale devices
+		{
+			"action": "accept",
+			"src":    ["group:admin"],
+			"dst":    ["*:*"],
+		},
+		// 2. Allow admins to access the local home subnet via the Subnet Router
+		// This allows you to reach 192.168.x.x devices without using the Exit Node
+		{
+			"action": "accept",
+			"src":    ["group:admin"],
+			"dst":    ["10.0.0.0/24:*"],
+		},
+		// 3. Allow CI runner to access the k3s nodes
+		{
+			"action": "accept",
+			"src":    ["tag:ci"],
+			"dst": [
+				"10.0.0.140/32:22",
+				"10.0.0.141/32:22",
+				"10.0.0.142/32:22",
+				"10.0.0.143/32:22",
+				"10.0.0.144/32:22",
+				"10.0.0.145/32:22",
+				// Kubernetes API via kube-vip (Terraform argocd-* plans/applies)
+				"10.0.0.200/32:6443",
+				// Traefik ingress (SigNoz dashboard endpoint for the smoke check)
+				"10.0.0.99/32:443",
+			],
+		},
+		// 4. Allow the CI runner to use the exit node (internet + DNS via the vault).
+		//    Exit-node use requires an explicit autogroup:internet grant.
+		{
+			"action": "accept",
+			"src":    ["tag:ci"],
+			"dst":    ["autogroup:internet:*"],
+		},
+		// 5. Allow the CI runner to SSH to deploy targets only.
+		//    (Rule 3 covers k3s; the deploy/closure-diff hosts were missing.)
+		{
+			"action": "accept",
+			"src":    ["tag:ci"],
+			"dst": [
+				"100.110.170.34:22", // homelab (Tailscale IP)
+				"100.127.170.8:22", // bee-gpu-server (Tailscale IP)
+				"100.116.132.19:22", // pikvm (Tailscale IP)
+				"100.112.185.27:22", // protecli-vault (Tailscale IP)
+			],
+		},
+		// 6. Plan jobs join as tag:ci-plan, separate from tag:ci, so a branch plan
+		//    does not hold the deploy tag's policy position. Only what a plan
+		//    reads: the Kubernetes API and Traefik. Apply keeps tag:ci.
+		{
+			"action": "accept",
+			"src":    ["tag:ci-plan"],
+			"dst": [
+				// Kubernetes API via kube-vip (Terraform argocd-* plans)
+				"10.0.0.200/32:6443",
+				// Traefik ingress (the SigNoz endpoint a plan reads)
+				"10.0.0.99/32:443",
+			],
+		},
+		{
+			"action": "accept",
+			"src":    ["tag:sandbox"],
+			"dst":    ["100.127.170.8:8080"],
+		},
+	],
+	"autoApprovers": {
+		"exitNode": ["tag:infrastructure"],
+	},
+}

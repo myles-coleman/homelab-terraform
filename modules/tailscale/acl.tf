@@ -1,14 +1,19 @@
-# Terraform does not own the tailnet policy yet: this reads it.
+# The tailnet policy file, as a file: who may reach what, which tags exist, and
+# which members can own them. It is the whole policy - Tailscale has no partial
+# resource - so every change to access control in this tailnet shows up as a diff
+# to `tailnet.hujson` and nothing else.
 #
-# The plan is the point. Reading the policy file needs a real Tailscale trust
-# credential (`policy_file` scope), so a successful plan here proves the
-# credential, the provider wiring and the CI plumbing before any of it is allowed
-# to write. `tailscale_acl.this` in the next commit replaces this data source
-# with the resource, once the live policy has been imported into state and the
-# file it will manage exists in this directory.
-data "tailscale_acl" "live" {}
+# The file was imported verbatim from the admin console; from the first apply on,
+# this resource is what the tailnet runs on.
+resource "tailscale_acl" "this" {
+  acl = file("${path.module}/tailnet.hujson")
 
-output "live_policy_sha256" {
-  description = "Hash of the tailnet policy the API currently holds; changes whenever someone edits it in the admin console"
-  value       = sha256(data.tailscale_acl.live.json)
+  # Both of these are Tailscale's defaults, written out because both are
+  # load-bearing:
+  #
+  # - an apply cannot replace a policy this state does not own, so the first run
+  #   has to be a reviewed `terragrunt import`, not an accident;
+  # - destroying this unit must never restore Tailscale's allow-all default.
+  overwrite_existing_content = false
+  reset_acl_on_destroy       = false
 }

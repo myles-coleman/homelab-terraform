@@ -13,9 +13,14 @@ a diff in a web console.
 
 ## Status
 
-The unit currently **reads** the policy file (`data "tailscale_acl" "live"`) and
-publishes its hash. Nothing it can do changes the tailnet. The switch to owning
-the file is a deliberate two-step, described below.
+This unit owns the policy file (`tailscale_acl.this` -> `tailnet.hujson`). The
+file was imported from the admin console verbatim, so the first apply after the
+import was a no-op apart from the intended `tag:ci-plan` addition.
+
+Still in the console, for now: which tags the CI OAuth client may mint. Managing
+that means importing the client (`tailscale_oauth_client`), which needs its live
+scope list to avoid silently rewriting the credential — a follow-up, tracked in
+#15.
 
 ## Credentials
 

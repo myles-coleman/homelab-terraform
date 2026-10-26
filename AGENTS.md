@@ -79,6 +79,14 @@ variables they need.
   destination `argocd` only, `Application` objects only, and nothing cluster-scoped. It bounds
   what the synced `manifests/bootstrap` path may create. The 46 child Applications it creates
   still run under that repository's `default` project, which this tree cannot change.
+- **plan tailnet identity** — plan jobs join the tailnet as `tag:ci-plan`, separate from the
+  `tag:ci` that apply and smoke use, so a branch plan does not sit in the deploy tag's ACL
+  position. `cloudflare` and `s3-backups` plans join no tailnet at all: their providers reach
+  only public endpoints. The grant lives in `modules/tailscale/tailnet.hujson`; the credential
+  that mints the nodes is the `TS_PLAN_OAUTH_*` pair, a client tagged `tag:ci-plan` **only** — a
+  node may only ask for tags that match its credential's list exactly, so a client holding both
+  `tag:ci` and `tag:ci-plan` is refused for either, which is how a one-client-two-tags attempt
+  took out every plan and apply. Credentials stay in the console; Terraform owns the policy.
 - **plan trust anchor** — the plan roles trust only the `ref:refs/heads/*` OIDC subject, which
   only a push to a branch of this repository can present; `pull_request` runs get no AWS
   credentials at all.
@@ -124,6 +132,12 @@ variables they need.
   with `403 Forbidden` rather than `404` for a caller in that position, which surfaces as
   `Error refreshing state: HeadObject ... Forbidden` from `tofu init`. So the first
   `terragrunt apply` for a new unit runs locally, and CI takes over from the second run.
+  fails to assume anything.
+- Changing the Tailscale tag or the credentials CI authenticates with. Each trust domain has
+  its own credential (`TS_OAUTH_*` for `tag:ci`, `TS_PLAN_OAUTH_*` for `tag:ci-plan`), and a
+  node may only ask for exactly its credential's tags — adding a second tag to one client
+  breaks the first. The tag also has to exist in `tailnet.hujson`; a missing tag fails every
+  plan job, and since `apply` needs `plan`, deploys stop too.
 - Replacing the state bucket or the GitHub OIDC role in `bootstrap/`. Any change there gets a
   plan on the branch's pull request; apply it by hand, from that plan, before merging anything
   that depends on it.

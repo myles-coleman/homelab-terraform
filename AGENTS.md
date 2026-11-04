@@ -14,6 +14,7 @@ modules/cloudflare/            # DNS records, zone, tunnel, Access
 modules/argocd-install/        # ArgoCD Helm install
 modules/argocd-configure/      # ArgoCD bootstrap configuration
 modules/s3-backups/            # backup bucket + lifecycle policy
+modules/signoz-alerts/         # SigNoz alert rules for the sandbox + Strata (has its own README)
 modules/signoz-dashboards/     # declarative SigNoz dashboards (has its own README)
 modules/tailscale/             # tailnet policy file + CI OAuth clients (has its own README)
 scripts/                       # signoz-dashboard-smoke.sh

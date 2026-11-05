@@ -53,10 +53,10 @@ locals {
 
 # ── Notification channel ───────────────────────────────────────────────────────
 # The rules API requires at least one channel. The provider's
-# `signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
-# which SigNoz v0.139.0 does not serve (the request falls through to the UI and
-# returns HTML 200). `sandbox-alerts-email` is created once via the v1 API
-# (`POST /api/v1/channels`, see README.md); the rule references it by name.
+# This unit has its own state, so it cannot reference the channel resource in
+# `signoz-dashboards/homelab-overview`. The channel itself is Terraform-managed
+# there (imported, not created); this unit references it by display name, which
+# is what the SigNoz API stores on the rule.
 
 # ── 1. Sandbox pod restarted ───────────────────────────────────────────────────
 # `changes()` rather than `increase()`: kubelet reports the restart count as a
@@ -107,7 +107,7 @@ resource "signoz_rule" "sandbox_pod_restarted" {
             op              = "above"
             target          = 0
             recovery_target = 0
-            channels        = ["sandbox-alerts-email"]
+            channels        = ["homelab-alerts-email"]
           },
         ]
       }
@@ -184,7 +184,7 @@ resource "signoz_rule" "strata_scrape_down" {
             op              = "below"
             target          = 1
             recovery_target = 1
-            channels        = ["sandbox-alerts-email"]
+            channels        = ["homelab-alerts-email"]
           },
         ]
       }
@@ -262,7 +262,7 @@ resource "signoz_rule" "sandbox_telemetry_not_ready" {
             op              = "below"
             target          = 1
             recovery_target = 1
-            channels        = ["sandbox-alerts-email"]
+            channels        = ["homelab-alerts-email"]
           },
         ]
       }
@@ -326,7 +326,7 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
             op              = "above"
             target          = 0.8
             recovery_target = 0.8
-            channels        = ["sandbox-alerts-email"]
+            channels        = ["homelab-alerts-email"]
           },
         ]
       }
@@ -391,7 +391,7 @@ resource "signoz_rule" "squid_denied_egress" {
             op              = "above"
             target          = 0
             recovery_target = 0
-            channels        = ["sandbox-alerts-email"]
+            channels        = ["homelab-alerts-email"]
           },
         ]
       }

@@ -10,12 +10,35 @@
 # unit would need its own entry in bootstrap/oidc.tf and a manual first apply,
 # which is more moving parts than one rule warrants.
 #
-# Channels: the rules API requires at least one. The provider's
-# `signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
-# which SigNoz v0.139.0 does not serve (the request falls through to the UI and
-# returns HTML 200). The channel is therefore created once via the v1 API
-# (`POST /api/v1/channels`, see README.md) and referenced by name. This keeps the
-# rule declarative while the channel lifecycle stays a documented operator step.
+# Channels: the rules API requires at least one. This unit owns the channel as a
+# Terraform resource again now that SigNoz v0.149.0 serves
+# `/api/v2/notification_channels` (0.139.0 answered with the UI's HTML, which is
+# why the channel lived outside Terraform for a while). The resource is imported,
+# not created: the channel already exists and rules reference it by display name.
+#
+# The v1 -> v2 migration at 0.149.0 rewrote the channel's immutable `name` to a
+# DNS-1123 label with a generated suffix, keeping the display name and the ID. The
+# `name` below is the one that migration produced; `display_name` is what rules
+# use, and is the value that must stay stable.
+import {
+  to = signoz_notification_channel.email
+  id = "01a1a9d0-7030-7826-897c-1cd31ab6085f"
+}
+
+resource "signoz_notification_channel" "email" {
+  name         = "homelab-alerts-email-acst754d"
+  display_name = "homelab-alerts-email"
+
+  config = {
+    email = {
+      kind = "email"
+      spec = {
+        to            = "mylescoleman05@gmail.com"
+        send_resolved = true
+      }
+    }
+  }
+}
 
 resource "signoz_rule" "clickhouse_volume_capacity" {
   alert      = "SigNoz ClickHouse volume above 80% used"
@@ -70,7 +93,7 @@ resource "signoz_rule" "clickhouse_volume_capacity" {
         kind = "basic"
         spec = [
           {
-            channels   = ["homelab-alerts-email"]
+            channels   = [signoz_notification_channel.email.display_name]
             match_type = "all_the_times"
             name       = "critical"
             op         = "below"

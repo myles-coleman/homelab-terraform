@@ -13,19 +13,14 @@ block a dashboard apply (or the reverse).
 | Resource | Signal | Backing series / source |
 | --- | --- | --- |
 | `sandbox_pod_restarted` | Sandbox container restarted | `k8s.container.restarts` via kubeletstats |
-| `strata_scrape_down` | Strata `/metrics` not scraped | `{__name__="up", "service.name"="strata"}` from `sandbox-telemetry` |
+| `strata_scrape_down` | Strata `/metrics` not scraped | `up` (builder query filtered by `service.name=strata`) from `sandbox-telemetry` |
 | `sandbox_conntrack_pressure` | Guest conntrack table > 80% | `node_nf_conntrack_entries*` from node-exporter |
 | `squid_denied_egress` | Sandbox tried to egress through the deny-all proxy | Squid container log `TCP_DENIED` |
 
-### Notification channel (operator prerequisite)
-
-The rules API requires at least one channel. The provider's
-`signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
-which SigNoz v0.139.0 does not serve (the request falls through to the UI and
-returns HTML 200). Create an email channel once in SigNoz under
-**Settings → Alert Channels** with the exact name `sandbox-alerts-email`; the
-rules reference it by name. SMTP is not configured yet, so the channel records
-firing state in the UI and starts delivering once SMTP is set.
+The rules fire in SigNoz's alert history even without a notification channel.
+Create a channel in SigNoz and add its display name to a rule's
+`channels` list when one exists; this module intentionally does not invent a
+webhook endpoint.
 
 ## Why some issue #74 signals are not here
 

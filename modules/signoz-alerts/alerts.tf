@@ -52,11 +52,25 @@ locals {
 }
 
 # ── Notification channel ───────────────────────────────────────────────────────
-# The rules API requires at least one channel. The provider's
-# `signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
-# which SigNoz v0.139.0 does not serve (the request falls through to the UI and
-# returns HTML 200). `sandbox-alerts-email` is created once via the v1 API
-# (`POST /api/v1/channels`, see README.md); the rule references it by name.
+# The rules API requires at least one channel. Email needs no external
+# integration; SigNoz's SMTP is not configured yet, so the channel records firing
+# state in the UI today and starts delivering once SMTP is set. This unit owns its
+# own channel so it does not depend on another unit's state.
+resource "signoz_notification_channel" "email" {
+  name         = "sandbox-alerts-email"
+  display_name = "sandbox-alerts-email"
+
+  config = {
+    email = {
+      kind = "email"
+      spec = {
+        to            = "mylescoleman05@gmail.com"
+        send_resolved = true
+      }
+    }
+  }
+}
+
 # ── 1. Sandbox pod restarted ───────────────────────────────────────────────────
 # `changes()` rather than `increase()`: kubelet reports the restart count as a
 # gauge, and a pod replacement resets it to zero. Counting label/value changes
@@ -105,7 +119,7 @@ resource "signoz_rule" "sandbox_pod_restarted" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0
-            channels   = ["sandbox-alerts-email"]
+            channels   = [signoz_notification_channel.email.display_name]
           },
         ]
       }
@@ -127,7 +141,7 @@ resource "signoz_rule" "sandbox_pod_restarted" {
 resource "signoz_rule" "strata_scrape_down" {
   alert          = "Strata metrics scrape is down"
   alert_type     = "METRIC_BASED_ALERT"
-  rule_type      = "promql_rule"
+  rule_type      = "threshold_rule"
   schema_version = "v2alpha1"
   description    = "The sandbox-telemetry collector has not scraped Strata successfully for 5 minutes. The model backend may be down, or the tailnet path from sandbox-node to bee-gpu-server has broken."
 
@@ -139,15 +153,31 @@ resource "signoz_rule" "strata_scrape_down" {
   condition = {
     composite_query = {
       panel_type = "graph"
-      query_type = "promql"
+      query_type = "builder"
       unit       = "count"
       queries = [
         {
-          promql = {
-            type = "promql"
+          builder_query = {
+            type = "builder_query"
             spec = {
-              name  = "A"
-              query = "max({__name__=\"up\", \"service.name\"=\"strata\"})"
+              metrics = {
+                name   = "A"
+                signal = "metrics"
+
+                aggregations = [
+                  {
+                    metric_name       = "up"
+                    space_aggregation = "max"
+                    time_aggregation  = "max"
+                  },
+                ]
+
+                filter = {
+                  expression = "service.name = 'strata'"
+                }
+
+                step_interval = "60"
+              }
             }
           }
         },
@@ -165,7 +195,7 @@ resource "signoz_rule" "strata_scrape_down" {
             match_type = "at_least_once"
             op         = "below"
             target     = 1
-            channels   = ["sandbox-alerts-email"]
+            channels   = [signoz_notification_channel.email.display_name]
           },
         ]
       }
@@ -228,7 +258,7 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0.8
-            channels   = ["sandbox-alerts-email"]
+            channels   = [signoz_notification_channel.email.display_name]
           },
         ]
       }
@@ -292,7 +322,7 @@ resource "signoz_rule" "squid_denied_egress" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0
-            channels   = ["sandbox-alerts-email"]
+            channels   = [signoz_notification_channel.email.display_name]
           },
         ]
       }

@@ -55,3 +55,11 @@ tofu fmt -check -recursive
   `signoz-k8s-infra` Prometheus preset). The Prometheus receiver relabels the
   node to `k8s_node_name`. Confirm the exact series/attribute names once data is
   flowing and adjust if the receiver renames them.
+
+## Notification channels
+
+SigNoz v0.139.0 does not serve `/api/v2/notification_channels`, so the provider's
+`signoz_notification_channel` resource cannot create channels. The
+`homelab-overview` unit references the email channel `homelab-alerts-email` by
+name; create it once in SigNoz under **Settings → Alert Channels**. SMTP is not
+configured yet, so the channel records firing state in the UI.

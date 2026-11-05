@@ -10,25 +10,12 @@
 # unit would need its own entry in bootstrap/oidc.tf and a manual first apply,
 # which is more moving parts than one rule warrants.
 #
-# Channels: the rules API requires at least one, so this file owns an email
-# channel. Email is the only channel type that needs no external integration, and
-# SigNoz's SMTP is not configured yet, so today the channel records firing state
-# in the UI; delivery starts working once SMTP is configured (follow-up).
-
-resource "signoz_notification_channel" "email" {
-  name         = "homelab-alerts-email"
-  display_name = "homelab-alerts-email"
-
-  config = {
-    email = {
-      kind = "email"
-      spec = {
-        to            = "mylescoleman05@gmail.com"
-        send_resolved = true
-      }
-    }
-  }
-}
+# Channels: the rules API requires at least one. The provider's
+# `signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
+# which SigNoz v0.139.0 does not serve (the request falls through to the UI and
+# returns HTML 200). The channel is therefore created once via the v1 API
+# (`POST /api/v1/channels`, see README.md) and referenced by name. This keeps the
+# rule declarative while the channel lifecycle stays a documented operator step.
 
 resource "signoz_rule" "clickhouse_volume_capacity" {
   alert      = "SigNoz ClickHouse volume above 80% used"
@@ -83,7 +70,7 @@ resource "signoz_rule" "clickhouse_volume_capacity" {
         kind = "basic"
         spec = [
           {
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["homelab-alerts-email"]
             match_type = "all_the_times"
             name       = "critical"
             op         = "below"

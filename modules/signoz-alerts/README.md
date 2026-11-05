@@ -2,7 +2,7 @@
 
 Sandbox + Strata detection rules for SigNoz, managed with Terragrunt + OpenTofu
 using the official [`SignNoz/signoz`](https://registry.terraform.io/providers/SigNoz/signoz/latest)
-provider (v0.1.4).
+provider (v0.1.5).
 
 This is a sibling of `signoz-dashboards`, not an extra unit inside it: alert
 rules and dashboards have separate lifecycles, and a broken alert should not
@@ -18,10 +18,12 @@ block a dashboard apply (or the reverse).
 | `sandbox_conntrack_pressure` | Guest conntrack entries > 80% of 131072 | `node_nf_conntrack_entries` from node-exporter |
 | `squid_denied_egress` | Sandbox tried to egress through the deny-all proxy | Squid container log `TCP_DENIED` |
 
-The rules fire in SigNoz's alert history even without a notification channel.
-Create a channel in SigNoz and add its display name to a rule's
-`channels` list when one exists; this module intentionally does not invent a
-webhook endpoint.
+The rules reference the `homelab-alerts-email` channel. That channel is managed
+by the `signoz-dashboards/homelab-overview` unit (it owns the notification-channel
+lifecycle, including the imported `homelab-alerts-email` display name). The rules
+API requires at least one channel, so do not remove the channel while these rules
+exist. SigNoz v0.149.0 serves the v2 channel API; the previous 0.139.0 workaround
+is gone.
 
 ## Why some issue #74 signals are not here
 

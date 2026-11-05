@@ -140,7 +140,7 @@ resource "signoz_rule" "strata_scrape_down" {
             type = "promql"
             spec = {
               name  = "A"
-              query = "max(up{job=\"strata\"})"
+              query = "max({__name__=\"up\", \"service.name\"=\"strata\"})"
             }
           }
         },

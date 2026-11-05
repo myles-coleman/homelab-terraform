@@ -40,30 +40,6 @@ resource "signoz_notification_channel" "email" {
   }
 }
 
-# The sandbox channel was created alongside the guardrail channel while the v2
-# channel API was unavailable. Every rule now points at the guardrail channel, so
-# this one is unused. It is imported here only so the next change can destroy it
-# through Terraform rather than by hand.
-import {
-  to = signoz_notification_channel.sandbox_unused
-  id = "01a1a9d0-444d-7a69-bd14-032ef9aebb8a"
-}
-
-resource "signoz_notification_channel" "sandbox_unused" {
-  name         = "sandbox-alerts-email-9xm4zxb8"
-  display_name = "sandbox-alerts-email"
-
-  config = {
-    email = {
-      kind = "email"
-      spec = {
-        to            = "mylescoleman05@gmail.com"
-        send_resolved = true
-      }
-    }
-  }
-}
-
 resource "signoz_rule" "clickhouse_volume_capacity" {
   alert      = "SigNoz ClickHouse volume above 80% used"
   alert_type = "METRIC_BASED_ALERT"

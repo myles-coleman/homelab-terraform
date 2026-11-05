@@ -10,9 +10,25 @@
 # unit would need its own entry in bootstrap/oidc.tf and a manual first apply,
 # which is more moving parts than one rule warrants.
 #
-# Channels are intentionally empty: this repository has no notification channel
-# yet, and alert routing is a non-goal of spec 26. The rule still records firing
-# state in SigNoz, and wiring a channel is a one-line change here.
+# Channels: the rules API requires at least one, so this file owns an email
+# channel. Email is the only channel type that needs no external integration, and
+# SigNoz's SMTP is not configured yet, so today the channel records firing state
+# in the UI; delivery starts working once SMTP is configured (follow-up).
+
+resource "signoz_notification_channel" "email" {
+  name         = "homelab-alerts-email"
+  display_name = "homelab-alerts-email"
+
+  config = {
+    email = {
+      kind = "email"
+      spec = {
+        to            = "mylescoleman05@gmail.com"
+        send_resolved = true
+      }
+    }
+  }
+}
 
 resource "signoz_rule" "clickhouse_volume_capacity" {
   alert      = "SigNoz ClickHouse volume above 80% used"
@@ -67,7 +83,7 @@ resource "signoz_rule" "clickhouse_volume_capacity" {
         kind = "basic"
         spec = [
           {
-            channels   = []
+            channels   = [signoz_notification_channel.email.display_name]
             match_type = "all_the_times"
             name       = "critical"
             op         = "below"

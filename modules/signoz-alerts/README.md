@@ -13,7 +13,8 @@ block a dashboard apply (or the reverse).
 | Resource | Signal | Backing series / source |
 | --- | --- | --- |
 | `sandbox_pod_restarted` | Sandbox container restarted | `k8s.container.restarts` via kubeletstats |
-| `strata_scrape_down` | Strata `/metrics` not scraped | `up` (builder query filtered by `service.name=strata`) from `sandbox-telemetry` |
+| `strata_scrape_down` | Strata `/metrics` scrape returned `up=0` | `up` builder query filtered by `service.name=strata` |
+| `sandbox_telemetry_not_ready` | The collector pod is not Ready | `k8s.container.ready` in `sandbox-telemetry` |
 | `sandbox_conntrack_pressure` | Guest conntrack table > 80% | `node_nf_conntrack_entries*` from node-exporter |
 | `squid_denied_egress` | Sandbox tried to egress through the deny-all proxy | Squid container log `TCP_DENIED` |
 

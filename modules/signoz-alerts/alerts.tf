@@ -123,14 +123,15 @@ resource "signoz_rule" "sandbox_pod_restarted" {
 
 # ── 2. Strata metrics stopped ──────────────────────────────────────────────────
 # `up` comes from the sandbox-telemetry collector's prometheus receiver
-# (`report_extra_scrape_metrics: true`). alert_on_absent covers the case where
-# the collector itself is gone and `up` is not produced at all.
+# (`report_extra_scrape_metrics: true`). It fires when a scrape returns `up=0`.
+# The collector's own disappearance is covered by the readiness rule below;
+# `alert_on_absent` here produced a permanent nodata false positive.
 resource "signoz_rule" "strata_scrape_down" {
   alert          = "Strata metrics scrape is down"
   alert_type     = "METRIC_BASED_ALERT"
   rule_type      = "threshold_rule"
   schema_version = "v2alpha1"
-  description    = "The sandbox-telemetry collector has not scraped Strata successfully for 5 minutes. The model backend may be down, or the tailnet path from sandbox-node to bee-gpu-server has broken."
+  description    = "A Strata scrape returned up=0. The model backend may be down, or the tailnet path from sandbox-node to bee-gpu-server has broken. Collector disappearance is covered by sandbox_telemetry_not_ready."
 
   annotations = {
     summary     = "Strata /metrics is not being scraped"
@@ -172,7 +173,6 @@ resource "signoz_rule" "strata_scrape_down" {
     }
 
     selected_query_name = "A"
-    alert_on_absent     = true
     thresholds = {
       basic = {
         kind = "basic"
@@ -194,6 +194,83 @@ resource "signoz_rule" "strata_scrape_down" {
   labels = {
     severity = "critical"
     signal   = "strata-availability"
+  }
+}
+
+# ── 2b. Sandbox telemetry collector not ready ──────────────────────────────────
+# `alert_on_absent` on the Strata rule was a false-positive generator: SigNoz
+# reports a nodata state for the absent-metric path even while `up=1`, and the
+# overall state stays firing. Cover the collector's own disappearance with the
+# kubelet readiness metric instead; the Strata rule then only fires when the
+# scrape itself returns `up=0`.
+resource "signoz_rule" "sandbox_telemetry_not_ready" {
+  alert          = "Sandbox telemetry collector is not ready"
+  alert_type     = "METRIC_BASED_ALERT"
+  rule_type      = "threshold_rule"
+  schema_version = "v2alpha1"
+  description    = "The sandbox-telemetry collector pod is not Ready, so Strata and sandbox telemetry are not being exported."
+
+  annotations = {
+    summary     = "sandbox-telemetry collector is not ready"
+    description = "k8s.container.ready is below 1 for the sandbox-telemetry collector. Check the pod on sandbox-node and its OTLP path to SigNoz."
+  }
+
+  condition = {
+    composite_query = {
+      panel_type = "graph"
+      query_type = "builder"
+      unit       = "count"
+      queries = [
+        {
+          builder_query = {
+            type = "builder_query"
+            spec = {
+              metrics = {
+                name   = "A"
+                signal = "metrics"
+
+                aggregations = [
+                  {
+                    metric_name       = "k8s.container.ready"
+                    space_aggregation = "min"
+                    time_aggregation  = "min"
+                  },
+                ]
+
+                filter = {
+                  expression = "k8s.namespace.name = 'sandbox-telemetry'"
+                }
+
+                step_interval = "60"
+              }
+            }
+          }
+        },
+      ]
+    }
+
+    selected_query_name = "A"
+    thresholds = {
+      basic = {
+        kind = "basic"
+        spec = [
+          {
+            name       = "critical"
+            match_type = "at_least_once"
+            op         = "below"
+            target     = 1
+            channels   = ["sandbox-alerts-email"]
+          },
+        ]
+      }
+    }
+  }
+
+  evaluation            = local.rolling_evaluation
+  notification_settings = local.notification_settings
+  labels = {
+    severity = "critical"
+    signal   = "telemetry-availability"
   }
 }
 

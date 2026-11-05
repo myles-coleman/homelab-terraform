@@ -77,6 +77,30 @@
 			"src":    ["tag:sandbox"],
 			"dst":    ["100.127.170.8:8080"],
 		},
+		// 7. Allow the k3s nodes to reach Strata's model endpoint only.
+		//    A pod's traffic leaves as the node's own tailnet identity, and every
+		//    k3s node carries tag:server, so the grant is written against the tag
+		//    rather than a pod or a user. One host, one port: SSH and every other
+		//    service on bee-gpu-server stay denied (spec 24).
+		{
+			"action": "accept",
+			"src":    ["tag:server"],
+			"dst":    ["100.127.170.8:8080"],
+		},
+	],
+	// Assertions the policy must keep satisfying. Tailscale evaluates these when
+	// the policy is applied: a failing test rejects the whole file, so a later
+	// edit cannot quietly drop the model path or widen it to SSH.
+	"tests": [
+		{
+			"src":    "tag:server",
+			"accept": ["100.127.170.8:8080"],
+			"deny":   ["100.127.170.8:22"],
+		},
+		{
+			"src":    "tag:sandbox",
+			"accept": ["100.127.170.8:8080"],
+		},
 	],
 	"autoApprovers": {
 		"exitNode": ["tag:infrastructure"],

@@ -179,6 +179,7 @@ locals {
     "modules/argocd-install",
     "modules/cloudflare",
     "modules/s3-backups",
+    "modules/signoz-alerts",
     "modules/signoz-dashboards/homelab-overview",
     "modules/signoz-dashboards/network-speeds",
     "modules/signoz-dashboards/pi5-thermal",

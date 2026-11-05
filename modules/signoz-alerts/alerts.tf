@@ -67,29 +67,25 @@ resource "signoz_rule" "sandbox_pod_restarted" {
   alert_type     = "METRIC_BASED_ALERT"
   rule_type      = "promql_rule"
   schema_version = "v2alpha1"
-  description    = "The OpenCode sandbox container restarted in the last 10 minutes. A gVisor crash, an OOM kill, or a probe failure is a security-relevant event on the untrusted node."
+  description    = "The OpenCode sandbox pod has been up for less than 10 minutes, so it restarted recently. A gVisor crash, an OOM kill, or a probe failure is a security-relevant event on the untrusted node."
 
   annotations = {
-    summary     = "Sandbox container restarted"
-    description = "pod={{$k8s.pod.name}} namespace={{$k8s.namespace.name}} — inspect the previous container log and /var/lib/runsc-logs on sandbox-node."
+    summary     = "Sandbox pod restarted"
+    description = "pod={{$k8s.pod.name}} namespace={{$k8s.namespace.name}} uptime={{$value}}s — inspect the previous container log and /var/lib/runsc-logs on sandbox-node."
   }
 
   condition = {
     composite_query = {
       panel_type = "graph"
       query_type = "promql"
-      unit       = "count"
+      unit       = "s"
       queries = [
         {
           promql = {
             type = "promql"
             spec = {
               name  = "A"
-              query = <<-PROMQL
-                sum by ("k8s.pod.name") (
-                  changes({__name__="k8s.container.restarts", "k8s.namespace.name"="agent-sandbox"}[10m])
-                )
-              PROMQL
+              query = "max by (\"k8s.pod.name\") ({__name__=\"k8s.pod.uptime\", \"k8s.namespace.name\"=\"agent-sandbox\"})"
             }
           }
         },
@@ -104,9 +100,9 @@ resource "signoz_rule" "sandbox_pod_restarted" {
           {
             name            = "critical"
             match_type      = "at_least_once"
-            op              = "above"
-            target          = 0
-            recovery_target = 0
+            op              = "below"
+            target          = 600
+            recovery_target = 600
             channels        = ["homelab-alerts-email"]
           },
         ]
@@ -286,7 +282,7 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
   alert_type     = "METRIC_BASED_ALERT"
   rule_type      = "promql_rule"
   schema_version = "v2alpha1"
-  description    = "The sandbox guest's conntrack table is close to its limit. This is the first saturation signal for an egress scan or a stuck proxy flow."
+  description    = "The sandbox guest's conntrack table is above 80% of its 131072-entry limit. This is the first saturation signal for an egress scan or a stuck proxy flow."
 
   annotations = {
     summary     = "Conntrack table pressure on sandbox-node"
@@ -297,18 +293,14 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
     composite_query = {
       panel_type = "graph"
       query_type = "promql"
-      unit       = "percentunit"
+      unit       = "count"
       queries = [
         {
           promql = {
             type = "promql"
             spec = {
               name  = "A"
-              query = <<-PROMQL
-                max by ("k8s_node_name") ({__name__="node_nf_conntrack_entries", "k8s_node_name"="sandbox-node"})
-                /
-                max by ("k8s_node_name") ({__name__="node_nf_conntrack_entries_limit", "k8s_node_name"="sandbox-node"})
-              PROMQL
+              query = "max({__name__=\"node_nf_conntrack_entries\", \"k8s_node_name\"=\"sandbox-node\"})"
             }
           }
         },
@@ -324,8 +316,8 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
             name            = "warning"
             match_type      = "at_least_once"
             op              = "above"
-            target          = 0.8
-            recovery_target = 0.8
+            target          = 104858
+            recovery_target = 104858
             channels        = ["homelab-alerts-email"]
           },
         ]

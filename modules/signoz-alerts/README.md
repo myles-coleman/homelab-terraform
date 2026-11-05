@@ -12,10 +12,10 @@ block a dashboard apply (or the reverse).
 
 | Resource | Signal | Backing series / source |
 | --- | --- | --- |
-| `sandbox_pod_restarted` | Sandbox container restarted | `k8s.container.restarts` via kubeletstats |
+| `sandbox_pod_restarted` | Sandbox pod up less than 10 minutes | `k8s.pod.uptime` via kubeletstats |
 | `strata_scrape_down` | Strata `/metrics` scrape returned `up=0` | `up` builder query filtered by `service.name=strata` |
 | `sandbox_telemetry_not_ready` | The collector pod is not Ready | `k8s.container.ready` in `sandbox-telemetry` |
-| `sandbox_conntrack_pressure` | Guest conntrack table > 80% | `node_nf_conntrack_entries*` from node-exporter |
+| `sandbox_conntrack_pressure` | Guest conntrack entries > 80% of 131072 | `node_nf_conntrack_entries` from node-exporter |
 | `squid_denied_egress` | Sandbox tried to egress through the deny-all proxy | Squid container log `TCP_DENIED` |
 
 The rules fire in SigNoz's alert history even without a notification channel.

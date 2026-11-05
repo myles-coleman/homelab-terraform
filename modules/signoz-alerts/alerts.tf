@@ -102,11 +102,12 @@ resource "signoz_rule" "sandbox_pod_restarted" {
         kind = "basic"
         spec = [
           {
-            name       = "critical"
-            match_type = "at_least_once"
-            op         = "above"
-            target     = 0
-            channels   = ["sandbox-alerts-email"]
+            name            = "critical"
+            match_type      = "at_least_once"
+            op              = "above"
+            target          = 0
+            recovery_target = 0
+            channels        = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -178,11 +179,12 @@ resource "signoz_rule" "strata_scrape_down" {
         kind = "basic"
         spec = [
           {
-            name       = "critical"
-            match_type = "at_least_once"
-            op         = "below"
-            target     = 1
-            channels   = ["sandbox-alerts-email"]
+            name            = "critical"
+            match_type      = "at_least_once"
+            op              = "below"
+            target          = 1
+            recovery_target = 1
+            channels        = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -255,11 +257,12 @@ resource "signoz_rule" "sandbox_telemetry_not_ready" {
         kind = "basic"
         spec = [
           {
-            name       = "critical"
-            match_type = "at_least_once"
-            op         = "below"
-            target     = 1
-            channels   = ["sandbox-alerts-email"]
+            name            = "critical"
+            match_type      = "at_least_once"
+            op              = "below"
+            target          = 1
+            recovery_target = 1
+            channels        = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -318,11 +321,12 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
         kind = "basic"
         spec = [
           {
-            name       = "warning"
-            match_type = "at_least_once"
-            op         = "above"
-            target     = 0.8
-            channels   = ["sandbox-alerts-email"]
+            name            = "warning"
+            match_type      = "at_least_once"
+            op              = "above"
+            target          = 0.8
+            recovery_target = 0.8
+            channels        = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -382,11 +386,12 @@ resource "signoz_rule" "squid_denied_egress" {
         kind = "basic"
         spec = [
           {
-            name       = "critical"
-            match_type = "at_least_once"
-            op         = "above"
-            target     = 0
-            channels   = ["sandbox-alerts-email"]
+            name            = "critical"
+            match_type      = "at_least_once"
+            op              = "above"
+            target          = 0
+            recovery_target = 0
+            channels        = ["sandbox-alerts-email"]
           },
         ]
       }

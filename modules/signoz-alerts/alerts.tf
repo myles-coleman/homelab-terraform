@@ -52,24 +52,11 @@ locals {
 }
 
 # ── Notification channel ───────────────────────────────────────────────────────
-# The rules API requires at least one channel. Email needs no external
-# integration; SigNoz's SMTP is not configured yet, so the channel records firing
-# state in the UI today and starts delivering once SMTP is set. This unit owns its
-# own channel so it does not depend on another unit's state.
-resource "signoz_notification_channel" "email" {
-  name         = "sandbox-alerts-email"
-  display_name = "sandbox-alerts-email"
-
-  config = {
-    email = {
-      kind = "email"
-      spec = {
-        to            = "mylescoleman05@gmail.com"
-        send_resolved = true
-      }
-    }
-  }
-}
+# The rules API requires at least one channel. The provider's
+# `signoz_notification_channel` resource posts to `/api/v2/notification_channels`,
+# which SigNoz v0.139.0 does not serve (the request falls through to the UI and
+# returns HTML 200). `sandbox-alerts-email` is created once via the v1 API
+# (`POST /api/v1/channels`, see README.md); the rule references it by name.
 
 # ── 1. Sandbox pod restarted ───────────────────────────────────────────────────
 # `changes()` rather than `increase()`: kubelet reports the restart count as a
@@ -119,7 +106,7 @@ resource "signoz_rule" "sandbox_pod_restarted" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -195,7 +182,7 @@ resource "signoz_rule" "strata_scrape_down" {
             match_type = "at_least_once"
             op         = "below"
             target     = 1
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -258,7 +245,7 @@ resource "signoz_rule" "sandbox_conntrack_pressure" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0.8
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["sandbox-alerts-email"]
           },
         ]
       }
@@ -322,7 +309,7 @@ resource "signoz_rule" "squid_denied_egress" {
             match_type = "at_least_once"
             op         = "above"
             target     = 0
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["sandbox-alerts-email"]
           },
         ]
       }

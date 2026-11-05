@@ -1,34 +1,11 @@
-# Capacity guardrail for the SigNoz ClickHouse volume (spec 26, task 4.0).
+# Channel: the rules API requires at least one channel, and this SigNoz
+# instance (v0.139.0) only exposes the v1 channels API - provider 0.1.5 targets
+# v2 and gets the UI's HTML back, which is why the channel is not managed here.
+# Create it once in the UI as `homelab-alerts-email` (Settings - Alert
+# Channels); the rule below references it by display name.
 #
-# The failure this prevents: the 40Gi volume reached 100%, the filesystem went
-# read-only, ClickHouse crash-looped for two and a half days, and the terraform
-# plan matrix went red behind it. The volume is now 80Gi, so 80% used is 16Gi
-# free; the rule fires while there is still room to act.
-#
-# It lives in the existing dashboard unit because that unit already owns the
-# signoz provider configuration and a bootstrap plan role. A dedicated alerts
-# unit would need its own entry in bootstrap/oidc.tf and a manual first apply,
-# which is more moving parts than one rule warrants.
-#
-# Channels: the rules API requires at least one, so this file owns an email
-# channel. Email is the only channel type that needs no external integration, and
-# SigNoz's SMTP is not configured yet, so today the channel records firing state
-# in the UI; delivery starts working once SMTP is configured (follow-up).
-
-resource "signoz_notification_channel" "email" {
-  name         = "homelab-alerts-email"
-  display_name = "homelab-alerts-email"
-
-  config = {
-    email = {
-      kind = "email"
-      spec = {
-        to            = "mylescoleman05@gmail.com"
-        send_resolved = true
-      }
-    }
-  }
-}
+# Why this is a name and not a resource reference: there is no channel resource
+# in provider 0.1.4, and 0.1.5's channel API does not exist on this version.
 
 resource "signoz_rule" "clickhouse_volume_capacity" {
   alert      = "SigNoz ClickHouse volume above 80% used"
@@ -83,7 +60,7 @@ resource "signoz_rule" "clickhouse_volume_capacity" {
         kind = "basic"
         spec = [
           {
-            channels   = [signoz_notification_channel.email.display_name]
+            channels   = ["homelab-alerts-email"]
             match_type = "all_the_times"
             name       = "critical"
             op         = "below"

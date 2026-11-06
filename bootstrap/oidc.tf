@@ -180,9 +180,12 @@ locals {
     "modules/cloudflare",
     "modules/s3-backups",
     "modules/signoz-alerts",
+    "modules/signoz-dashboards/agent-traces",
     "modules/signoz-dashboards/homelab-overview",
     "modules/signoz-dashboards/network-speeds",
     "modules/signoz-dashboards/pi5-thermal",
+    "modules/signoz-dashboards/sandbox-runtime",
+    "modules/signoz-dashboards/strata-endpoint",
     "modules/tailscale",
   ])
 

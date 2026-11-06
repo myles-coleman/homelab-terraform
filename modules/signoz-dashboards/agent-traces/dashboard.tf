@@ -335,104 +335,101 @@ resource "signoz_dashboard" "agent_traces" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      traces = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "traces"
-                        aggregations = [
-                          {
-                            expression = "count()"
-                          },
-                        ]
-                        filter = {
-                          expression = "deployment.environment = 'agent-sandbox'"
-                        }
-                        group_by = [
-                          {
-                            name            = "name"
-                            field_context   = "span"
-                            field_data_type = "string"
-                          },
-                        ]
-                        order = [
-                          {
-                            key = {
-                              name = "count()"
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              traces = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "traces"
+                                aggregations = [
+                                  {
+                                    expression = "count()"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "deployment.environment = 'agent-sandbox'"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "name"
+                                    field_context   = "span"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                order = [
+                                  {
+                                    key = {
+                                      name = "count()"
+                                    }
+                                    direction = "desc"
+                                  },
+                                ]
+                                limit = 10
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "total {{name}}"
+                              }
                             }
-                            direction = "desc"
-                          },
-                        ]
-                        limit = 10
-                        having = {
-                          expression = ""
-                        }
-                        legend = "total {{name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      traces = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "traces"
-                        aggregations = [
-                          {
-                            expression = "countIf(has_error = true)"
-                          },
-                        ]
-                        filter = {
-                          expression = "deployment.environment = 'agent-sandbox'"
-                        }
-                        group_by = [
-                          {
-                            name            = "name"
-                            field_context   = "span"
-                            field_data_type = "string"
-                          },
-                        ]
-                        order = [
-                          {
-                            key = {
-                              name = "countIf(has_error = true)"
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              traces = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "traces"
+                                aggregations = [
+                                  {
+                                    expression = "countIf(has_error = true)"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "deployment.environment = 'agent-sandbox'"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "name"
+                                    field_context   = "span"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                order = [
+                                  {
+                                    key = {
+                                      name = "countIf(has_error = true)"
+                                    }
+                                    direction = "desc"
+                                  },
+                                ]
+                                limit = 10
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "errors {{name}}"
+                              }
                             }
-                            direction = "desc"
-                          },
-                        ]
-                        limit = 10
-                        having = {
-                          expression = ""
-                        }
-                        legend = "errors {{name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  formula = {
-                    kind = "signoz/Formula"
-                    spec = {
-                      name       = "C"
-                      expression = "B / A * 100"
-                      legend     = "{{name}}"
+                          }
+                        },
+                        {
+                          builder_formula = {
+                            type = "builder_formula"
+                            spec = {
+                              name       = "C"
+                              expression = "B / A * 100"
+                              legend     = "{{name}}"
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }

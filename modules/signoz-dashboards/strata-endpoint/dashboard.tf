@@ -203,74 +203,77 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "strata:gpu_mem_used_bytes"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        group_by = [
-                          {
-                            name            = "gpu"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "used GPU {{gpu}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "strata:gpu_mem_total_bytes"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        group_by = [
-                          {
-                            name            = "gpu"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "total GPU {{gpu}}"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "strata:gpu_mem_used_bytes"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "gpu"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "used GPU {{gpu}}"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "strata:gpu_mem_total_bytes"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "gpu"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "total GPU {{gpu}}"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -824,60 +827,63 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "strata:ram_used_bytes"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "used"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "strata:ram_total_bytes"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "total"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "strata:ram_used_bytes"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "used"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "strata:ram_total_bytes"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "total"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1411,76 +1417,73 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:prefix_cache_hits_total"
-                            time_aggregation  = "rate"
-                            space_aggregation = "sum"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "hits"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:prefix_cache_queries_total"
-                            time_aggregation  = "rate"
-                            space_aggregation = "sum"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "queries"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  formula = {
-                    kind = "signoz/Formula"
-                    spec = {
-                      name       = "C"
-                      expression = "A / B"
-                      legend     = "hit ratio"
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:prefix_cache_hits_total"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "sum"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "hits"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:prefix_cache_queries_total"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "sum"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "queries"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_formula = {
+                            type = "builder_formula"
+                            spec = {
+                              name       = "C"
+                              expression = "A / B"
+                              legend     = "hit ratio"
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1537,76 +1540,73 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:spec_decode_num_accepted_tokens_total"
-                            time_aggregation  = "rate"
-                            space_aggregation = "sum"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "accepted"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:spec_decode_num_draft_tokens_total"
-                            time_aggregation  = "rate"
-                            space_aggregation = "sum"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "draft"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  formula = {
-                    kind = "signoz/Formula"
-                    spec = {
-                      name       = "C"
-                      expression = "A / B"
-                      legend     = "acceptance"
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:spec_decode_num_accepted_tokens_total"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "sum"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "accepted"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:spec_decode_num_draft_tokens_total"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "sum"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "draft"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_formula = {
+                            type = "builder_formula"
+                            spec = {
+                              name       = "C"
+                              expression = "A / B"
+                              legend     = "acceptance"
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1662,92 +1662,89 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:e2e_request_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p50"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p50"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:e2e_request_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p95"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p95"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "C"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:e2e_request_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p99"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p99"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:e2e_request_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p50"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p50"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:e2e_request_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p95"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p95"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "C"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:e2e_request_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p99"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p99"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1803,92 +1800,89 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:time_to_first_token_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p50"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p50"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:time_to_first_token_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p95"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p95"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "C"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:time_to_first_token_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p99"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p99"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:time_to_first_token_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p50"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p50"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:time_to_first_token_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p95"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p95"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "C"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:time_to_first_token_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p99"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p99"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1944,92 +1938,89 @@ resource "signoz_dashboard" "strata_endpoint" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:inter_token_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p50"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p50"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:inter_token_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p95"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p95"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "C"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "C"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "vllm:inter_token_latency_seconds.bucket"
-                            time_aggregation  = "rate"
-                            space_aggregation = "p99"
-                          },
-                        ]
-                        filter = {
-                          expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "p99"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:inter_token_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p50"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p50"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:inter_token_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p95"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p95"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "C"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "vllm:inter_token_latency_seconds.bucket"
+                                    time_aggregation  = "rate"
+                                    space_aggregation = "p99"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "host.name = 'bee-gpu-server' AND model_name IN $model"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "p99"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }

@@ -450,74 +450,77 @@ resource "signoz_dashboard" "sandbox_runtime" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.cpu_request_utilization"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.pod.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "request {{k8s.pod.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.cpu_limit_utilization"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.pod.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "limit {{k8s.pod.name}}"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "k8s.pod.cpu_request_utilization"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "k8s.pod.name"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "request {{k8s.pod.name}}"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "k8s.pod.cpu_limit_utilization"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "k8s.pod.name"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "limit {{k8s.pod.name}}"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -581,74 +584,77 @@ resource "signoz_dashboard" "sandbox_runtime" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.memory_request_utilization"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.pod.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "request {{k8s.pod.name}}"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "k8s.pod.memory_limit_utilization"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
-                        }
-                        group_by = [
-                          {
-                            name            = "k8s.pod.name"
-                            field_context   = "attribute"
-                            field_data_type = "string"
-                          },
-                        ]
-                        having = {
-                          expression = ""
-                        }
-                        legend = "limit {{k8s.pod.name}}"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "k8s.pod.memory_request_utilization"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "k8s.pod.name"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "request {{k8s.pod.name}}"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "k8s.pod.memory_limit_utilization"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s.namespace.name = 'agent-sandbox' AND k8s.pod.name IN $pod"
+                                }
+                                group_by = [
+                                  {
+                                    name            = "k8s.pod.name"
+                                    field_context   = "attribute"
+                                    field_data_type = "string"
+                                  },
+                                ]
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "limit {{k8s.pod.name}}"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1195,60 +1201,63 @@ resource "signoz_dashboard" "sandbox_runtime" {
               spec = {
                 name = "A"
                 plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
+                  composite_query = {
+                    kind = "signoz/CompositeQuery"
                     spec = {
-                      metrics = {
-                        name          = "A"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "node_nf_conntrack_entries"
-                            time_aggregation  = "avg"
-                            space_aggregation = "avg"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s_node_name = 'sandbox-node'"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "entries"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            {
-              kind = "time_series"
-              spec = {
-                name = "B"
-                plugin = {
-                  builder_query = {
-                    kind = "signoz/BuilderQuery"
-                    spec = {
-                      metrics = {
-                        name          = "B"
-                        step_interval = "60"
-                        signal        = "metrics"
-                        aggregations = [
-                          {
-                            metric_name       = "node_nf_conntrack_entries_limit"
-                            time_aggregation  = "max"
-                            space_aggregation = "max"
-                          },
-                        ]
-                        filter = {
-                          expression = "k8s_node_name = 'sandbox-node'"
-                        }
-                        having = {
-                          expression = ""
-                        }
-                        legend = "limit"
-                      }
+                      queries = [
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "A"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "node_nf_conntrack_entries"
+                                    time_aggregation  = "avg"
+                                    space_aggregation = "avg"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s_node_name = 'sandbox-node'"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "entries"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          builder_query = {
+                            type = "builder_query"
+                            spec = {
+                              metrics = {
+                                name          = "B"
+                                step_interval = "60"
+                                signal        = "metrics"
+                                aggregations = [
+                                  {
+                                    metric_name       = "node_nf_conntrack_entries_limit"
+                                    time_aggregation  = "max"
+                                    space_aggregation = "max"
+                                  },
+                                ]
+                                filter = {
+                                  expression = "k8s_node_name = 'sandbox-node'"
+                                }
+                                having = {
+                                  expression = ""
+                                }
+                                legend = "limit"
+                              }
+                            }
+                          }
+                        },
+                      ]
                     }
                   }
                 }
@@ -1313,7 +1322,7 @@ resource "signoz_dashboard" "sandbox_runtime" {
                         signal        = "logs"
                         aggregations = [
                           {
-                            expression = "countIf(body CONTAINS 'TCP_DENIED')"
+                            expression = "countIf(body LIKE '%TCP_DENIED%')"
                           },
                         ]
                         filter = {

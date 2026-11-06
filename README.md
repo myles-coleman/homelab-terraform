@@ -27,7 +27,7 @@ so a new unit needs no workflow edit.
 | `modules/argocd-install/` | ArgoCD: namespace, Helm release, and the OIDC client secret for its SSO configuration. |
 | `modules/argocd-configure/` | The ArgoCD `bootstrap` Application that hands off to `homelab-cluster`. Depends on `argocd-install`. |
 | `modules/s3-backups/` | The Longhorn backup bucket and the scoped IAM user and policy that writes to it. |
-| `modules/signoz-dashboards/{homelab-overview,network-speeds,pi5-thermal}/` | One SigNoz dashboard each. See [`modules/signoz-dashboards/README.md`](modules/signoz-dashboards/README.md). |
+| `modules/signoz-dashboards/` | One SigNoz dashboard per unit: cluster overview, network, thermal, sandbox runtime, Strata endpoint, and agent traces. See [`modules/signoz-dashboards/README.md`](modules/signoz-dashboards/README.md). |
 
 `bootstrap/` is plain OpenTofu rather than Terragrunt, and is applied by hand once before
 any unit: it creates the S3 state bucket, the GitHub OIDC provider, one read-only plan role

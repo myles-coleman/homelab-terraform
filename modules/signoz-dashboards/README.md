@@ -14,6 +14,9 @@ dashboard cannot block the others:
 | `homelab-overview/` | Homelab Overview — cluster/node triage surface |
 | `network-speeds/` | Network Speeds — internet speed tests + node/pod throughput |
 | `pi5-thermal/` | Pi 5 Thermal — per-node temperature, CPU frequency, load |
+| `sandbox-runtime/` | Sandbox Runtime — pod and guest-node health, conntrack pressure, Squid denials |
+| `strata-endpoint/` | Strata Endpoint — GPU, Strata engine, vLLM latency and cache |
+| `agent-traces/` | Agent Traces — span volume/latency, uncaught errors, correlated logs |
 
 ## Configuration
 
@@ -55,6 +58,23 @@ tofu fmt -check -recursive
   `signoz-k8s-infra` Prometheus preset). The Prometheus receiver relabels the
   node to `k8s_node_name`. Confirm the exact series/attribute names once data is
   flowing and adjust if the receiver renames them.
+- **Time ranges**: `sandbox-runtime` and `strata-endpoint` default to 6 hours;
+  `agent-traces` defaults to 1 hour. The maximum useful range is 15 days for
+  traces and logs and 30 days for metrics, matching SigNoz retention.
+- **Top-N**: the `agent-traces` volume, latency, and error panels show the top
+  10 span names in the selected window, sorted descending.
+- **Colon-containing names**: `strata:*` and `vllm:*` are quoted verbatim. The
+  Prometheus receiver does not rename them, so the panels and the smoke check
+  use the colon form.
+- **Deliberate omissions**: `agent-traces` has no `Tool.execute` distribution, no
+  model-call/tool-call split, and no spans-per-trace panel. The pinned agent build
+  emits no `Tool.execute` or model-call span, and the provider has no two-stage
+  aggregation over `trace_id` (and the spec forbids grouping a time series by
+  `trace_id`). `strata-endpoint` has no per-consumer panels: `strata_consumer` is
+  always `shared`, there is no finish-reason label, and there is no 401 counter.
+- **Squid assertions**: the denial panel can legitimately show zero. The smoke
+  check therefore asserts that Squid logs are arriving, not that requests are
+  being denied.
 
 ## Notification channels
 

@@ -81,6 +81,19 @@ checks=(
   "network-speeds|heartbeat|metrics||speedtest_download_bits_per_second"
   "pi5-thermal|principal|metrics||node_thermal_zone_temp"
   "pi5-thermal|heartbeat|metrics||node_thermal_zone_temp"
+  # Sandbox runtime: conntrack is the principal series; pod CPU is the ingest
+  # heartbeat. The Squid check asserts that access logs are arriving, not that
+  # requests are being denied: zero denials with a healthy volume is the goal.
+  "sandbox-runtime|principal|metrics|k8s_node_name = 'sandbox-node'|node_nf_conntrack_entries"
+  "sandbox-runtime|heartbeat|metrics|k8s.namespace.name = 'agent-sandbox'|k8s.pod.cpu.usage"
+  "sandbox-runtime|squid-logs|logs|k8s.namespace.name = 'squid'|count()"
+  # Strata endpoint: colon-containing names are quoted verbatim.
+  "strata-endpoint|principal|metrics|host.name = 'bee-gpu-server'|strata:gpu_util"
+  "strata-endpoint|heartbeat|metrics|host.name = 'bee-gpu-server'|strata:gpu_util"
+  # Agent traces: the heartbeat is a count and the principal is a latency
+  # expression. Both require the cluster-side ingest spec to be live.
+  "agent-traces|heartbeat|traces|deployment.environment = 'agent-sandbox'|count()"
+  "agent-traces|principal|traces|deployment.environment = 'agent-sandbox'|p95(duration_nano)"
 )
 
 build_payload() {

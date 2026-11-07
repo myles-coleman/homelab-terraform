@@ -70,6 +70,24 @@ resource "kubernetes_manifest" "bootstrap" {
         repoURL        = "https://github.com/myles-coleman/homelab-cluster"
         targetRevision = "main"
       }
+      # Argo CD 3.5's application controller adds its own
+      # `pre-delete-finalizer.argocd.argoproj.io` and
+      # `pre-delete-finalizer.argocd.argoproj.io/cleanup` entries to child
+      # Applications. They are not in the cluster repository's generated
+      # manifests, so without this the root Application never returns to
+      # Synced - and a permanently OutOfSync root hides real drift in the
+      # children. Ignore only those entries: `resources-finalizer` and every
+      # other field of every child Application are still compared.
+      ignoreDifferences = [
+        {
+          group = "argoproj.io"
+          kind  = "Application"
+          jqPathExpressions = [
+            ".metadata.finalizers[]? | select(startswith(\"pre-delete-finalizer.argocd.argoproj.io\"))",
+          ]
+        },
+      ]
+
       syncPolicy = {
         automated = {
           prune    = true
@@ -83,6 +101,9 @@ resource "kubernetes_manifest" "bootstrap" {
           }
           limit = 5
         }
+        # Keep the live value of the ignored finalizer entries instead of
+        # stripping them, so the controller does not have to re-add them.
+        syncOptions = ["RespectIgnoreDifferences=true"]
       }
     }
   }

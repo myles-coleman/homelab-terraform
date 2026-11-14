@@ -184,7 +184,7 @@ a generated file. Change the generating block and the next run produces the new 
 ## Secret Handling
 
 - Configuration reads secrets only through `get_env(...)`: `CLOUDFLARE_API_TOKEN`,
-  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `ALLOWED_EMAILS`,
+  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `ALLOWED_EMAILS`, `AUTHENTIK_TOKEN`,
   `SIGNOZ_ENDPOINT`, `SIGNOZ_ACCESS_TOKEN`, and `KUBECONFIG` (base64, `argocd-*` units only).
 - In CI these come from GitHub Actions secrets and variables; locally, export them in the
   shell. Never write a value into a `.tf`, `.hcl`, or `.yaml` file.

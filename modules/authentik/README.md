@@ -29,8 +29,10 @@ middleware, and the Cloudflare tunnel must route its hostname.
    already brings up.
 2. **`AUTHENTIK_TOKEN` exists** as a GitHub Actions secret. Create an API token in
    Authentik (Directory → Tokens, or a dedicated service account) and store it.
-   The provider reads the environment variable itself, so the token never enters
-   `_provider.tf` or Terraform state.
+   `deploy.yaml` maps it to `TF_VAR_authentik_token`, so OpenTofu resolves the
+   `token` argument at run time. The provider marks `token` as required and does
+   not read an environment variable itself, so the variable reference is what
+   keeps the value out of `_provider.tf` and state.
 3. **The unit is registered with bootstrap.** Add `modules/authentik` to
    `local.plan_units` in `bootstrap/oidc.tf`, then apply `bootstrap/` by hand so
    the `terraform-plan-authentik` role exists. Without it the plan fails to
@@ -44,7 +46,7 @@ middleware, and the Cloudflare tunnel must route its hostname.
 ## Workflow
 
 ```sh
-export AUTHENTIK_TOKEN=...        # never commit this
+export TF_VAR_authentik_token=...   # never commit this
 cd modules/authentik
 terragrunt init -backend=false && tofu init -backend=false && tofu validate
 terragrunt plan

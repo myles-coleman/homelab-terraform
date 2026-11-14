@@ -42,9 +42,13 @@ generate "provider" {
   if_exists = "overwrite_terragrunt"
   contents  = <<EOF
 provider "authentik" {
-  # The API token is read from the AUTHENTIK_TOKEN environment variable, so it
-  # is never written into this generated file or into Terraform state.
   url = "${local.common_inputs.authentik_url}"
+  # A variable reference, not an interpolation: the token is resolved by
+  # OpenTofu from TF_VAR_authentik_token at run time, so no credential is ever
+  # written into this generated file or into Terraform state. The provider
+  # marks `token` as required and does not fall back to an environment variable
+  # itself, which is why the reference has to be here.
+  token = var.authentik_token
 }
 EOF
 }

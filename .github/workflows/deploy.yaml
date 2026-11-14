@@ -201,8 +201,10 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
-      # The authentik unit's provider reads this name directly.
-      AUTHENTIK_TOKEN: ${{ secrets.AUTHENTIK_TOKEN }}
+      # The authentik unit's provider takes its token as a required argument, so
+      # OpenTofu resolves it from this input variable. Units that declare no such
+      # variable ignore it. The secret name stays AUTHENTIK_TOKEN.
+      TF_VAR_authentik_token: ${{ secrets.AUTHENTIK_TOKEN }}
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
       # The tailscale unit owns the tailnet policy file. Its provider reads these
@@ -504,8 +506,10 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
       GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
-      # The authentik unit's provider reads this name directly.
-      AUTHENTIK_TOKEN: ${{ secrets.AUTHENTIK_TOKEN }}
+      # The authentik unit's provider takes its token as a required argument, so
+      # OpenTofu resolves it from this input variable. Units that declare no such
+      # variable ignore it. The secret name stays AUTHENTIK_TOKEN.
+      TF_VAR_authentik_token: ${{ secrets.AUTHENTIK_TOKEN }}
       SIGNOZ_ENDPOINT: ${{ vars.SIGNOZ_ENDPOINT }}
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
       # The tailscale unit manages the tailnet policy file and the CI OAuth

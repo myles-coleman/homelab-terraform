@@ -1,6 +1,19 @@
 variable "authentik_url" {
-  description = "Base URL of the Authentik instance. The API token is not an input: the provider reads AUTHENTIK_TOKEN from the environment."
+  description = "Base URL of the Authentik instance."
   type        = string
+}
+
+variable "authentik_token" {
+  description = "Authentik API token. Supplied at run time from TF_VAR_authentik_token, which CI maps from the AUTHENTIK_TOKEN secret. Never set it in a file."
+  type        = string
+  sensitive   = true
+
+  # Defaulted to empty so `tofu validate` passes in the credential-free validate
+  # job: the provider marks `token` as required, so it must appear in the
+  # provider block, but validation must not need a real value. A plan or apply
+  # that reaches the API without this set fails on authentication, which is the
+  # loud failure we want.
+  default = ""
 }
 
 variable "domain" {

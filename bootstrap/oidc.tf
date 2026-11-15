@@ -177,6 +177,7 @@ locals {
   plan_units = toset([
     "modules/argocd-configure",
     "modules/argocd-install",
+    "modules/authentik",
     "modules/cloudflare",
     "modules/s3-backups",
     "modules/signoz-alerts",

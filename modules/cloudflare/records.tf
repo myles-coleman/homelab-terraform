@@ -53,3 +53,30 @@ resource "cloudflare_dns_record" "docs_cname" {
   content = "myles-coleman.github.io"
   ttl     = 1
 }
+
+# Tunnel hostnames.
+#
+# These are explicit CNAMEs to the tunnel, so they override the *.cowlab.org
+# wildcard A record that points at the LAN address. proxied must stay true: the
+# tunnel only receives traffic for proxied records, and an unproxied CNAME would
+# point browsers at cfargotunnel.com directly.
+#
+# Keep these in step with the ingress list in tunnel.tf. A record without a
+# matching ingress rule resolves to the tunnel and then gets the 404 catch-all.
+resource "cloudflare_dns_record" "tunnel_authentik" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "authentik.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+resource "cloudflare_dns_record" "tunnel_jellyfin" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "jellyfin.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}

@@ -17,11 +17,10 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.homelab.id
 
   config = {
+    # No service hostnames are published through the tunnel. jellyfin was
+    # withdrawn together with its route in myles-coleman/homelab-cluster
+    # (spec 04); the catch-all 404 is all that remains.
     ingress = [
-      {
-        hostname = "jellyfin.${var.domain}"
-        service  = "http://traefik.traefik.svc.cluster.local:80"
-      },
       {
         # Catch-all rule (required) - returns 404 for unmatched requests
         service = "http_status:404"
@@ -31,16 +30,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
       enabled = false
     }
   }
-}
-
-# DNS record pointing to the tunnel
-resource "cloudflare_dns_record" "tunnel_jellyfin" {
-  zone_id = cloudflare_zone.cowlab.id
-  name    = "jellyfin.${var.domain}"
-  type    = "CNAME"
-  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
-  proxied = true
-  ttl     = 1
 }
 
 # Data source to get the tunnel token for use in Kubernetes

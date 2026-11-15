@@ -35,17 +35,20 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         }
       },
       {
-        # Jellyfin streams video through this route. Cloudflare's service terms
-        # restrict serving video over a proxied hostname on the Free plan and
-        # point at Stream instead; this is discretionary enforcement, not a
-        # byte counter, but it is the one route here that touches that rule.
-        # Delete this block (and its DNS record) to keep Jellyfin LAN/tailnet
-        # only — SSO still applies locally, the tunnel is what changes.
+        # Jellyfin is outside the cluster and gated by its Cloudflare Access
+        # application, so the tunnel goes straight to the host rather than
+        # through Traefik. That keeps video on one hop and avoids the fact that
+        # Traefik's Gateway provider cannot reference an address outside the
+        # cluster (no Endpoints/EndpointSlice from Git — both are excluded in
+        # argocd-cm — and ExternalName is refused).
+        #
+        # Cloudflare's service terms restrict serving video over a proxied
+        # hostname on the Free plan and point at Stream instead; this is
+        # discretionary enforcement, not a byte counter, but it is the one rule
+        # this route touches. Delete this block and its DNS record to keep
+        # Jellyfin internal only.
         hostname = "jellyfin.cowlab.org"
-        service  = "https://traefik.traefik.svc.cluster.local:443"
-        origin_request = {
-          origin_server_name = "jellyfin.cowlab.org"
-        }
+        service  = "http://10.0.0.150:8096"
       },
       {
         # Catch-all rule (required) - returns 404 for unmatched requests

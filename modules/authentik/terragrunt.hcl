@@ -19,15 +19,15 @@ inputs = {
   # Each application is reachable only by the groups listed here. Adding an app
   # does not expose it: the Traefik IngressRoute must also carry the `authentik`
   # forwardAuth middleware, and the tunnel must route its hostname.
+  # No applications yet. Jellyfin is outside the cluster and is gated by its
+  # Cloudflare Access application instead — the Traefik forward-auth route could
+  # not reach a host with no in-cluster endpoints (EndpointSlice/Endpoints are
+  # excluded in argocd-cm, ExternalName is unsupported by the Gateway provider).
+  #
+  # The first in-cluster application goes here. It also needs the shared
+  # Middleware referenced from its HTTPRoute, plus a ReferenceGrant naming that
+  # namespace.
   applications = {
-    jellyfin = {
-      name          = "Jellyfin"
-      slug          = "jellyfin"
-      external_host = "https://jellyfin.${local.common_inputs.domain}"
-      mode          = "forward_single"
-      groups        = ["homelab"]
-    }
-
     # sonarr = {
     #   name          = "Sonarr"
     #   slug          = "sonarr"

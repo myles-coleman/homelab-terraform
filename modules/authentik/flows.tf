@@ -32,3 +32,16 @@ data "authentik_flow" "invalidation" {
     }
   }
 }
+
+# The flow every source runs to create a first-time user. The enrollment policy
+# binds to this.
+data "authentik_flow" "enrollment" {
+  slug = "default-source-enrollment"
+
+  lifecycle {
+    postcondition {
+      condition     = self.id != null && self.id != ""
+      error_message = "No Authentik flow matched slug \"default-source-enrollment\". The enrollment allowlist policy cannot be bound without it."
+    }
+  }
+}

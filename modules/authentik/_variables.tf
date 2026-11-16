@@ -3,6 +3,25 @@ variable "authentik_url" {
   type        = string
 }
 
+variable "allowed_emails" {
+  description = "Email addresses permitted to complete source enrollment. Same list the Cloudflare Access policy admits. An empty list fails the plan rather than silently denying everyone."
+
+  type = list(string)
+
+  validation {
+    condition     = length(var.allowed_emails) > 0
+    error_message = "allowed_emails is empty, so the enrollment policy would deny every Google account including your own. ALLOWED_EMAILS is a repository secret: restore it (gh secret set ALLOWED_EMAILS) and re-plan."
+  }
+
+  validation {
+    condition = alltrue([
+      for email in var.allowed_emails :
+      trimspace(email) != "" && can(regex("^[^@,;\\s]+@[^@,;\\s]+\\.[^@,;\\s]+$", email))
+    ])
+    error_message = "Every entry in ALLOWED_EMAILS must be a plain email address. Got: ${jsonencode(var.allowed_emails)}."
+  }
+}
+
 variable "authentik_token" {
   description = "Authentik API token. Supplied at run time from TF_VAR_authentik_token, which CI maps from the AUTHENTIK_TOKEN secret. Never set it in a file."
   type        = string

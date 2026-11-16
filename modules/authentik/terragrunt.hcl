@@ -4,11 +4,20 @@ include "root" {
 
 locals {
   common_inputs = yamldecode(file(find_in_parent_folders("common-inputs.yaml")))
+
+  # Same source as the Cloudflare Access policy: ALLOWED_EMAILS is the single
+  # list of people who may use this homelab, and it is a repository secret rather
+  # than a file so addresses stay out of this public repo.
+  allowed_emails = [
+    for email in split(",", get_env("ALLOWED_EMAILS")) : trimspace(replace(email, "\"", ""))
+  ]
 }
 
 inputs = {
   authentik_url = local.common_inputs.authentik_url
   domain        = local.common_inputs.domain
+
+  allowed_emails = local.allowed_emails
 
   groups = {
     homelab = {

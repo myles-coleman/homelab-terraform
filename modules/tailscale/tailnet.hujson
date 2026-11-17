@@ -8,6 +8,7 @@
 		"tag:server":         ["group:admin"],
 		"tag:infrastructure": ["group:admin"],
 		"tag:sandbox":        ["group:admin"],
+		"tag:media-egress":   ["group:admin"],
 	},
 	"acls": [
 		// 1. Allow admins to access all Tailscale devices
@@ -87,6 +88,19 @@
 			"src":    ["tag:server"],
 			"dst":    ["100.127.170.8:8080"],
 		},
+		// 8. k8s egress sidecars (qBittorrent, Prowlarr) may use the tailnet
+		//    exit node for internet, and reach Pi-hole/Unbound on the Vault for
+		//    DNS. No other tailnet or LAN access is granted.
+		{
+			"action": "accept",
+			"src":    ["tag:media-egress"],
+			"dst":    ["autogroup:internet:*"],
+		},
+		{
+			"action": "accept",
+			"src":    ["tag:media-egress"],
+			"dst":    ["100.112.185.27:53"],
+		},
 	],
 	// Assertions the policy must keep satisfying. Tailscale evaluates these when
 	// the policy is applied: a failing test rejects the whole file, so a later
@@ -100,6 +114,11 @@
 		{
 			"src":    "tag:sandbox",
 			"accept": ["100.127.170.8:8080"],
+		},
+		{
+			"src":    "tag:media-egress",
+			"accept": ["100.112.185.27:53"],
+			"deny":   ["100.112.185.27:22"],
 		},
 	],
 	"autoApprovers": {

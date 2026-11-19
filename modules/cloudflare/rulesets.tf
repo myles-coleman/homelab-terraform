@@ -23,7 +23,7 @@ resource "cloudflare_ruleset" "authentik_rate_limit" {
     enabled     = true
     expression  = "(http.host eq \"authentik.cowlab.org\" and (starts_with(http.request.uri.path, \"/source/oauth/\") or starts_with(http.request.uri.path, \"/flows/\")))"
     ratelimit = {
-      characteristics     = ["ip.src"]
+      characteristics     = ["cf.colo.id", "ip.src"]
       period              = 60
       requests_per_period = 30
       mitigation_timeout  = 60

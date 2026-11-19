@@ -10,8 +10,9 @@
 
 # Per-IP rate limit on the entry points an unauthenticated visitor can hit: the
 # OAuth start/callback and the flow executor. This zone's plan only allows a
-# 10-second period, so use 10 requests per 10 seconds (~60/min): far above a
-# human login and far below a scripted attempt.
+# 10-second period and a 10-second mitigation timeout, so use 10 requests per
+# 10 seconds (~60/min) and a 10-second block: far above a human login and far
+# below a scripted attempt.
 resource "cloudflare_ruleset" "authentik_rate_limit" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "authentik login rate limit"
@@ -27,7 +28,7 @@ resource "cloudflare_ruleset" "authentik_rate_limit" {
       characteristics     = ["cf.colo.id", "ip.src"]
       period              = 10
       requests_per_period = 10
-      mitigation_timeout  = 60
+      mitigation_timeout  = 10
     }
   }]
 }

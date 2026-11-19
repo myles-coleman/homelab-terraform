@@ -54,7 +54,21 @@ dex:
   metrics:
     enabled: true
 
+# configs.secret.extra must stay non-empty. The chart's argocd-secret template
+# only emits a `data:` block when one of its configs.secret.* values is set (see
+# templates/argocd-configs/argocd-secret.yaml and its warning "Setting a blank
+# data again will wipe admin password/key/cert"). With an empty extra the
+# rendered Secret carries no data at all, and Helm's three-way merge nulls the
+# whole map - which deletes server.secretkey, the key ArgoCD generates for
+# itself on first start and every component reads. That is exactly what happened
+# when the client secret was moved to ESO: dex crashlooped on
+# "server.secretkey is missing". The clientID below is not a secret; it is kept
+# to hold the data block open. clientSecret stays owned by the ExternalSecret.
 configs:
+  secret:
+    extra:
+      oidc.sso.clientID: argocd
+
   cm:
     exec.enabled: true
     admin.enabled: true

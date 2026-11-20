@@ -72,6 +72,15 @@ resource "cloudflare_dns_record" "tunnel_authentik" {
   ttl     = 1
 }
 
+resource "cloudflare_dns_record" "tunnel_jellyseerr" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "jellyseerr.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
 resource "cloudflare_dns_record" "tunnel_jellyfin" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "jellyfin.${var.domain}"

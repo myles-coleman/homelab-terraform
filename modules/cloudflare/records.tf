@@ -46,14 +46,6 @@ resource "cloudflare_dns_record" "lb_wildcard" {
   ttl     = 1
 }
 
-resource "cloudflare_dns_record" "docs_cname" {
-  zone_id = cloudflare_zone.cowlab.id
-  name    = "docs.cowlab.org"
-  type    = "CNAME"
-  content = "myles-coleman.github.io"
-  ttl     = 1
-}
-
 # Tunnel hostnames.
 #
 # These are explicit CNAMEs to the tunnel, so they override the *.cowlab.org

@@ -56,6 +56,16 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         }
       },
       {
+        # Copyparty is gated by the Authentik forward-auth middleware. Chunked
+        # uploads keep each request under the 100 MB body limit, which is why
+        # its chunk ceiling must stay at or below 96 MiB (spec 05, Unit 3).
+        hostname = "copyparty.cowlab.org"
+        service  = "https://traefik.traefik.svc.cluster.local:443"
+        origin_request = {
+          origin_server_name = "copyparty.cowlab.org"
+        }
+      },
+      {
         # Jellyfin is outside the cluster and gated by its Cloudflare Access
         # application, so the tunnel goes straight to the host rather than
         # through Traefik. That keeps video on one hop and avoids the fact that

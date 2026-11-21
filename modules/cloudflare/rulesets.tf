@@ -48,3 +48,34 @@ resource "cloudflare_ruleset" "authentik_admin_challenge" {
     expression  = "(http.host eq \"authentik.cowlab.org\" and starts_with(http.request.uri.path, \"/if/admin\"))"
   }]
 }
+
+# Guardrail for the published file server.
+#
+# This is not an abuse filter in the Authentik sense — the host is already gated.
+# It is the bounded-usage commitment made in spec 05: traffic to this hostname
+# is visibly modest rather than open-ended.
+#
+# The limit is deliberately generous per window because the app's upload
+# protocol is request-per-chunk: a 1 GB file is ~11 POSTs of 96 MiB, and up2k
+# sends up to six in parallel. A login-style 10-per-10-seconds threshold would
+# throttle legitimate transfers, so this allows 60 per 10 seconds (~6/s) per
+# source IP, which bounds a script while staying clear of a browser upload.
+resource "cloudflare_ruleset" "copyparty_rate_limit" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "copyparty rate limit"
+  kind    = "zone"
+  phase   = "http_ratelimit"
+
+  rules = [{
+    action      = "block"
+    description = "Throttle Copyparty per source IP without throttling chunked uploads"
+    enabled     = true
+    expression  = "(http.host eq \"copyparty.cowlab.org\")"
+    ratelimit = {
+      characteristics     = ["cf.colo.id", "ip.src"]
+      period              = 10
+      requests_per_period = 60
+      mitigation_timeout  = 10
+    }
+  }]
+}

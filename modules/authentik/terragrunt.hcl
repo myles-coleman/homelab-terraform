@@ -46,6 +46,12 @@ inputs = {
       external_host = "https://openwebui.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
+    copyparty = {
+      name          = "Copyparty"
+      slug          = "copyparty"
+      external_host = "https://copyparty.${local.common_inputs.domain}"
+      groups        = ["homelab"]
+    }
   }
 }
 

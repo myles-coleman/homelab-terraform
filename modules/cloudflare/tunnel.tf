@@ -46,6 +46,16 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         }
       },
       {
+        # Open WebUI is an OIDC client, not a forward-auth host: there is no
+        # middleware and no outpost hop for its traffic. The tunnel still goes
+        # through the Gateway, which is what holds the wildcard certificate.
+        hostname = "openwebui.cowlab.org"
+        service  = "https://traefik.traefik.svc.cluster.local:443"
+        origin_request = {
+          origin_server_name = "openwebui.cowlab.org"
+        }
+      },
+      {
         # Jellyfin is outside the cluster and gated by its Cloudflare Access
         # application, so the tunnel goes straight to the host rather than
         # through Traefik. That keeps video on one hop and avoids the fact that

@@ -82,14 +82,21 @@ configs:
   params:
     "server.insecure": true
 
-  # Chart 10.x renders argocd-secret with only the keys under configs.secret.*,
-  # and it never emits server.secretkey or admin.password - those are generated
-  # by argocd-server into the live Secret at startup. With force_update below,
-  # every release replace rewrites that Secret from the chart manifest and drops
-  # them, which surfaces as "server.secretkey is missing" on every API call that
-  # loads settings. Setting createSecret: false removes the Secret from the
-  # release entirely, so Helm has nothing to replace; the Secret is left alone
-  # and ESO + argocd-server own its data (see manifests/cluster/argocd-secret).
+  # This chart renders argocd-secret from configs.secret.* only: it never renders
+  # server.secretkey, and it renders admin.password only when
+  # configs.secret.argocdServerAdminPassword is set. Both are instead written into
+  # the live Secret by argocd-server at startup (InitializeSettings). With
+  # force_update below, the provider runs `helm upgrade --force`, and helm
+  # replaces every object in the release instead of patching it - so an apply
+  # rebuilds the Secret's data from the manifest and drops those keys, which
+  # surfaces as "server.secretkey is missing" on every API call that loads
+  # settings.
+  #
+  # createSecret: false drops the Secret from the rendered manifest. Helm deletes
+  # resources that disappear from a release manifest on upgrade, so the Secret
+  # also has to carry `helm.sh/resource-policy: keep`; the ExternalSecret in
+  # manifests/cluster/argocd-secret sets it. With both, helm never replaces or
+  # deletes it, and ESO plus argocd-server own its data.
   secret:
     createSecret: false
 EOF

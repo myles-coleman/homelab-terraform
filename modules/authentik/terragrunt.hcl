@@ -33,20 +33,17 @@ inputs = {
   #
   # Jellyseerr keeps its own login behind the gate: no stable release supports
   # OIDC or forward-auth, so the gate is a perimeter control, not single sign-on.
-  oauth2_applications = {
-    openwebui = {
-      name          = "Open WebUI"
-      slug          = "openwebui"
-      redirect_uris = ["https://openwebui.${local.common_inputs.domain}/oauth/oidc/callback"]
-      groups        = ["homelab"]
-    }
-  }
-
   applications = {
     jellyseerr = {
       name          = "Jellyseerr"
       slug          = "jellyseerr"
       external_host = "https://jellyseerr.${local.common_inputs.domain}"
+      groups        = ["homelab"]
+    }
+    openwebui = {
+      name          = "Open WebUI"
+      slug          = "openwebui"
+      external_host = "https://openwebui.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
   }

@@ -21,32 +21,10 @@ resource "authentik_policy_binding" "app_group" {
   order  = 0
 }
 
-# Same authorization model for the OIDC applications: one binding per
-# (application, group) pair, and an empty `groups` list admits nobody.
-locals {
-  oauth2_group_bindings = merge([
-    for app_key, app in var.oauth2_applications : {
-      for group_key in app.groups :
-      "${app_key}/${group_key}" => {
-        app   = app_key
-        group = group_key
-      }
-    }
-  ]...)
-}
-
-resource "authentik_policy_binding" "oauth2_app_group" {
-  for_each = local.oauth2_group_bindings
-
-  target = authentik_application.oauth2[each.value.app].uuid
-  group  = authentik_group.this[each.value.group].id
-  order  = 0
-}
-
 check "every_group_is_declared" {
   assert {
     condition = alltrue([
-      for binding in concat(values(local.app_group_bindings), values(local.oauth2_group_bindings)) :
+      for binding in values(local.app_group_bindings) :
       contains(keys(var.groups), binding.group)
     ])
     error_message = "An application references a group that is not declared in var.groups. Declare it there first; the policy binding would otherwise fail with an invalid index."

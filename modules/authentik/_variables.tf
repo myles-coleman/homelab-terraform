@@ -78,45 +78,6 @@ variable "applications" {
   }
 }
 
-variable "oauth2_applications" {
-  description = "Applications that speak OIDC natively, as opposed to the forward-auth proxy providers in var.applications. Reachable only by members of the groups listed here; an empty list admits nobody."
-
-  type = map(object({
-    name                   = string
-    slug                   = string
-    redirect_uris          = list(string)
-    client_type            = optional(string, "confidential")
-    groups                 = optional(list(string), [])
-    access_code_validity   = optional(string, "minutes=5")
-    access_token_validity  = optional(string, "hours=8")
-    refresh_token_validity = optional(string, "days=30")
-  }))
-  default = {}
-
-  validation {
-    condition = alltrue([
-      for app in var.oauth2_applications : length(app.redirect_uris) > 0
-    ])
-    error_message = "Every oauth2 application needs at least one redirect URI; without one the authorization request has nowhere to return to."
-  }
-
-  validation {
-    condition = alltrue([
-      for app in var.oauth2_applications : alltrue([
-        for uri in app.redirect_uris : startswith(uri, "https://")
-      ])
-    ])
-    error_message = "Every redirect URI must start with https:// — credentials are only issued over TLS, and a plain-http callback would be rejected at the token exchange."
-  }
-
-  validation {
-    condition = alltrue([
-      for app in var.oauth2_applications : contains(["confidential", "public"], app.client_type)
-    ])
-    error_message = "client_type must be either confidential or public."
-  }
-}
-
 variable "outpost_name" {
   description = "Name of the proxy outpost the Traefik forwardAuth middleware authenticates against."
   type        = string

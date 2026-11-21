@@ -16,15 +16,16 @@ resource "helm_release" "argocd" {
   force_update = true
   atomic       = true
   namespace    = kubernetes_namespace.argocd.id
-  # The OIDC client secret is deliberately not managed here. It is owned by the
-  # ExternalSecret that the `argocd-secret` Application creates from Vaultwarden
-  # (manifests/cluster/argocd-secret in myles-coleman/homelab-cluster), and the
-  # external Dex validates that same Vaultwarden item. Terraform used to seed the
-  # key from random_password and ESO then overwrote it - two owners, plus a window
-  # on every apply where ArgoCD held a secret Dex no longer accepted. Leaving the
-  # key out also means the bundled dex-server must not reference it: that
-  # dex-server is not the identity provider (configs.cm.oidc.config points at the
-  # external Dex), so a cold install has nothing to wait for before ESO runs.
+  # argocd-secret is owned by the ExternalSecret that the `argocd-secret`
+  # Application creates from Vaultwarden (manifests/cluster/argocd-secret in
+  # myles-coleman/homelab-cluster): the OIDC client secret that the external Dex
+  # validates, plus server.secretkey. Terraform used to seed the client secret
+  # from random_password and ESO then overwrote it - two owners, plus a window on
+  # every apply where ArgoCD held a secret Dex no longer accepted. The bundled
+  # dex-server must not reference either key: it is not the identity provider
+  # (configs.cm.oidc.config points at the external Dex), so a cold install has
+  # nothing to wait for before ESO runs. See configs.secret below for why the
+  # chart must not render the Secret at all.
   values = [<<EOF
 # Chart 10.0.0 flipped this default to true, so the upgrade created six
 # NetworkPolicies in the argocd namespace. The cluster CNI is k3s' embedded
@@ -94,6 +95,24 @@ configs:
 
   params:
     "server.insecure": true
+
+  # This chart renders argocd-secret from configs.secret.* only: it never renders
+  # server.secretkey, and it renders admin.password only when
+  # configs.secret.argocdServerAdminPassword is set. Both are instead written into
+  # the live Secret by argocd-server at startup (InitializeSettings). With
+  # force_update below, the provider runs `helm upgrade --force`, and helm
+  # replaces every object in the release instead of patching it - so an apply
+  # rebuilds the Secret's data from the manifest and drops those keys, which
+  # surfaces as "server.secretkey is missing" on every API call that loads
+  # settings.
+  #
+  # createSecret: false drops the Secret from the rendered manifest. Helm deletes
+  # resources that disappear from a release manifest on upgrade, so the Secret
+  # also has to carry `helm.sh/resource-policy: keep`; the ExternalSecret in
+  # manifests/cluster/argocd-secret sets it. With both, helm never replaces or
+  # deletes it, and ESO plus argocd-server own its data.
+  secret:
+    createSecret: false
 EOF
   ]
 }

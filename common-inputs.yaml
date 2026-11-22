@@ -8,7 +8,7 @@ kubeconfig_context: default
 
 argocd_host: argocd.cowlab.org
 
-authentik_url: https://authentik.cowlab.org
+authentik_url: https://auth.cowlab.org
 
 domain: cowlab.org
 

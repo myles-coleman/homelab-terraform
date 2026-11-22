@@ -58,16 +58,6 @@ inputs = {
       external_host = "https://copyparty.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
-    # YouTube URL -> English transcript. The route and its ReferenceGrant live in
-    # homelab-cluster (manifests/cluster/transcript); this entry is the identity
-    # side. No proxied DNS record: the hostname resolves through the wildcard and
-    # is LAN-only, so remote browsers cannot reach it.
-    transcript = {
-      name          = "Transcript"
-      slug          = "transcript"
-      external_host = "https://transcript.${local.common_inputs.domain}"
-      groups        = ["homelab"]
-    }
   }
 }
 

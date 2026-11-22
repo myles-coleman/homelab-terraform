@@ -25,7 +25,7 @@ middleware, and the Cloudflare tunnel must route its hostname.
 
 1. **Authentik is running and reachable.** This unit's provider talks to
    `authentik_url` over the tailnet; a plan from a GitHub runner resolves
-   `authentik.cowlab.org` to `10.0.0.99` and needs the tailnet node the plan job
+   `auth.cowlab.org` to `10.0.0.99` and needs the tailnet node the plan job
    already brings up.
 2. **`AUTHENTIK_TOKEN` exists** as a GitHub Actions secret. Create an API token in
    Authentik (Directory → Tokens, or a dedicated service account) and store it.

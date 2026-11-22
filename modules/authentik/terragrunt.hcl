@@ -58,6 +58,14 @@ inputs = {
       external_host = "https://copyparty.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
+    # Spec 07 temporary canary: the first post-source-change login runs on a
+    # throwaway host. Remove this entry after the spec 07 rollout.
+    auth-canary = {
+      name          = "Auth Canary"
+      slug          = "auth-canary"
+      external_host = "https://auth-canary.${local.common_inputs.domain}"
+      groups        = ["homelab"]
+    }
   }
 }
 

@@ -26,8 +26,11 @@ so a new unit needs no workflow edit.
 | `modules/cloudflare/` | The `cowlab.org` zone and its DNS records, a Cloudflare tunnel with an Access application, and Google as a Zero Trust identity provider. |
 | `modules/argocd-install/` | ArgoCD: namespace, Helm release, and the OIDC client secret for its SSO configuration. |
 | `modules/argocd-configure/` | The ArgoCD `bootstrap` Application that hands off to `homelab-cluster`. Depends on `argocd-install`. |
+| `modules/authentik/` | Declarative Authentik configuration — groups, forward-auth proxy providers, the applications that use them, and the Traefik outpost. It does **not** deploy Authentik; the server, Postgres and Redis come from `homelab-cluster`. See [`modules/authentik/README.md`](modules/authentik/README.md). |
 | `modules/s3-backups/` | The Longhorn backup bucket and the scoped IAM user and policy that writes to it. |
 | `modules/signoz-dashboards/` | One SigNoz dashboard per unit: cluster overview, network, thermal, sandbox runtime, Strata endpoint, and agent traces. See [`modules/signoz-dashboards/README.md`](modules/signoz-dashboards/README.md). |
+| `modules/signoz-alerts/` | Sandbox and Strata detection rules for SigNoz. A sibling of `signoz-dashboards` rather than part of it: alert rules and dashboards have separate lifecycles. See [`modules/signoz-alerts/README.md`](modules/signoz-alerts/README.md). |
+| `modules/tailscale/` | The tailnet itself — the policy file (access rules, tags, hosts) and the OAuth clients CI authenticates with, replacing configuration that used to be clicked into the admin console. See [`modules/tailscale/README.md`](modules/tailscale/README.md). |
 
 `bootstrap/` is plain OpenTofu rather than Terragrunt, and is applied by hand once before
 any unit: it creates the S3 state bucket, the GitHub OIDC provider, one read-only plan role

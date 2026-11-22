@@ -5,7 +5,7 @@
 # admin interface rather than blocking the host.
 #
 # /api/ is deliberately excluded from both rules. The authentik Terraform
-# provider talks to https://authentik.cowlab.org/api/v3/ from CI, and a challenge
+# provider talks to https://auth.cowlab.org/api/v3/ from CI, and a challenge
 # or a throttle there breaks plan and apply instead of protecting anything.
 
 # Per-IP rate limit on the entry points an unauthenticated visitor can hit: the
@@ -23,7 +23,7 @@ resource "cloudflare_ruleset" "authentik_rate_limit" {
     action      = "block"
     description = "Throttle Authentik login and OAuth entry points per source IP"
     enabled     = true
-    expression  = "(http.host eq \"authentik.cowlab.org\" and (starts_with(http.request.uri.path, \"/source/oauth/\") or starts_with(http.request.uri.path, \"/flows/\")))"
+    expression  = "(http.host eq \"auth.cowlab.org\" and (starts_with(http.request.uri.path, \"/source/oauth/\") or starts_with(http.request.uri.path, \"/flows/\")))"
     ratelimit = {
       characteristics     = ["cf.colo.id", "ip.src"]
       period              = 10
@@ -45,6 +45,6 @@ resource "cloudflare_ruleset" "authentik_admin_challenge" {
     action      = "managed_challenge"
     description = "Challenge the Authentik admin interface; login flows and API stay exempt"
     enabled     = true
-    expression  = "(http.host eq \"authentik.cowlab.org\" and starts_with(http.request.uri.path, \"/if/admin\"))"
+    expression  = "(http.host eq \"auth.cowlab.org\" and starts_with(http.request.uri.path, \"/if/admin\"))"
   }]
 }

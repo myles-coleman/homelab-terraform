@@ -63,15 +63,6 @@ resource "cloudflare_dns_record" "lb_wildcard" {
 # layer external-dns will own next; until it does, adding a remotely reachable
 # service means adding one of these blocks.
 
-resource "cloudflare_dns_record" "tunnel_authentik" {
-  zone_id = cloudflare_zone.cowlab.id
-  name    = "authentik.${var.domain}"
-  type    = "CNAME"
-  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
-  proxied = true
-  ttl     = 1
-}
-
 # Transition alias: kept so that bookmarks to the pre-rename hostname still work
 # remotely, where the cluster's 301 can only be reached through the tunnel.
 # Delete alongside the matching `httproute-legacy-host.yaml` in the cluster repo.
@@ -84,6 +75,11 @@ resource "cloudflare_dns_record" "tunnel_jellyseerr" {
   ttl     = 1
 }
 
+# `authentik.cowlab.org` had a record here until the rename to auth.cowlab.org
+# was finished. It was withdrawn only after the route stopped serving it and the
+# Google redirect URI for it was removed, so nothing pointed at a dead host on the
+# way out. Removing the record is what unpublishes the name; the *.cowlab.org
+# wildcard still resolves it inside the LAN, where Traefik now answers 404.
 resource "cloudflare_dns_record" "tunnel_seerr" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "seerr.${var.domain}"

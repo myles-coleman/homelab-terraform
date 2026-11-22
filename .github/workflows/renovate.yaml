@@ -1,0 +1,62 @@
+name: Renovate
+
+# Self-hosted Renovate for Terragrunt/OpenTofu dependencies: provider version
+# constraints in the units, the `uses:` pins in this directory, and the
+# pre-commit hook revs.
+#
+# Nothing is generated here for Renovate to refresh: `.terraform.lock.hcl` and
+# the Terragrunt-generated `_backend.tf` / `_provider.tf` are gitignored, so a
+# bump PR only changes the constraint and CI plans against the new version.
+#
+# Authentication is a GitHub App installation token minted per run. Its pull
+# requests DO trigger `pull_request` workflows, so `deploy.yaml` plans them;
+# GITHUB_TOKEN would not, and the plan comment would silently never appear.
+# The App needs Workflows: write, because Renovate bumps the `uses:` pins here.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+env:
+  RENOVATE_VERSION: 44.257.9
+
+jobs:
+  renovate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Environment secret, not a repository secret: a same-repo pull_request
+    # workflow must not be able to read a write-capable credential. `main` only,
+    # and deliberately no required reviewers, which would stall every run.
+    environment: renovate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ vars.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+          owner: myles-coleman
+          repositories: homelab-terraform
+
+      - name: Renovate
+        env:
+          RENOVATE_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Attribute commits to the bot rather than to whatever user the token
+          # belongs to.
+          RENOVATE_USERNAME: ${{ steps.app-token.outputs.app-slug }}[bot]
+          RENOVATE_GIT_AUTHOR: ${{ steps.app-token.outputs.app-slug }}[bot] <${{ vars.RENOVATE_APP_ID }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>
+          RENOVATE_REPOSITORIES: '["myles-coleman/homelab-terraform"]'
+          LOG_LEVEL: info
+        run: npx --yes "renovate@${RENOVATE_VERSION}"

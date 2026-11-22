@@ -21,50 +21,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
     # entrypoint redirects to https, so a tunnel pointed at :80 would return a
     # 301 to the browser, which would come straight back through the tunnel and
     # loop.
-    #
-    # origin_server_name keeps certificate verification on. cloudflared dials the
-    # service address (traefik.traefik.svc.cluster.local) but presents the
-    # public hostname as SNI, which is what the Gateway's wildcard certificate
-    # covers. no_tls_verify would also work and would verify nothing.
     ingress = [
-      {
-        hostname = "authentik.cowlab.org"
-        service  = "https://traefik.traefik.svc.cluster.local:443"
-        origin_request = {
-          origin_server_name = "authentik.cowlab.org"
-        }
-      },
-      {
-        # Jellyseerr is in-cluster and keeps its own login behind the gate.
-        # The gate is a perimeter control: no stable Jellyseerr release supports
-        # OIDC or forward-auth, so users authenticate twice — once here, once in
-        # the app. accepted by spec 05.
-        hostname = "jellyseerr.cowlab.org"
-        service  = "https://traefik.traefik.svc.cluster.local:443"
-        origin_request = {
-          origin_server_name = "jellyseerr.cowlab.org"
-        }
-      },
-      {
-        # Open WebUI is an OIDC client, not a forward-auth host: there is no
-        # middleware and no outpost hop for its traffic. The tunnel still goes
-        # through the Gateway, which is what holds the wildcard certificate.
-        hostname = "openwebui.cowlab.org"
-        service  = "https://traefik.traefik.svc.cluster.local:443"
-        origin_request = {
-          origin_server_name = "openwebui.cowlab.org"
-        }
-      },
-      {
-        # Copyparty is gated by the Authentik forward-auth middleware. Chunked
-        # uploads keep each request under the 100 MB body limit, which is why
-        # its chunk ceiling must stay at or below 96 MiB (spec 05, Unit 3).
-        hostname = "copyparty.cowlab.org"
-        service  = "https://traefik.traefik.svc.cluster.local:443"
-        origin_request = {
-          origin_server_name = "copyparty.cowlab.org"
-        }
-      },
       {
         # Jellyfin is outside the cluster and gated by its Cloudflare Access
         # application, so the tunnel goes straight to the host rather than
@@ -80,6 +37,30 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "homelab" {
         # Jellyfin internal only.
         hostname = "jellyfin.cowlab.org"
         service  = "http://10.0.0.150:8096"
+      },
+      {
+        # One rule for every in-cluster hostname.
+        #
+        # Previously each remotely reachable host had its own ingress rule and
+        # its own origin_server_name, so publishing a service meant editing this
+        # file, adding a DNS record, and keeping the two in step. match_sn_ito_host
+        # replaces the per-host origin_server_name: cloudflared presents the
+        # request's Host as SNI, which the Gateway's *.cowlab.org certificate
+        # covers. Adding a host is now a proxied CNAME (records.tf) plus an
+        # HTTPRoute in the cluster repo — and once external-dns owns the records,
+        # only the HTTPRoute.
+        #
+        # `match_sn_ito_host` is spelled that way in the provider schema
+        # (cloudflare/cloudflare 5.18.0, zero_trust_tunnel_cloudflared_config);
+        # it maps to Cloudflare's matchSNItoHost. Do not "fix" it.
+        #
+        # Order matters: this wildcard must come after the rule that leaves the
+        # cluster, and before the required catch-all.
+        hostname = "*.cowlab.org"
+        service  = "https://traefik.traefik.svc.cluster.local:443"
+        origin_request = {
+          match_sn_ito_host = true
+        }
       },
       {
         # Catch-all rule (required) - returns 404 for unmatched requests

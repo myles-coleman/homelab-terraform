@@ -27,23 +27,29 @@ inputs = {
 
   # Each application is reachable only by the groups listed here. Adding an app
   # does not expose it: the Traefik HTTPRoute must also carry the shared
-  # `authentik` forward-auth Middleware, a ReferenceGrant must name that route's
-  # namespace, and the tunnel must route its hostname for the host to be
-  # reachable from the internet.
+  # `authentik` forward-auth Middleware and a ReferenceGrant must name that
+  # route's namespace. For remote access it also needs a proxied DNS record; the
+  # tunnel is a single wildcard rule, so the record is the whole change there.
   #
-  # Jellyseerr keeps its own login behind the gate: no stable release supports
-  # OIDC or forward-auth, so the gate is a perimeter control, not single sign-on.
+  # The map keys are resource addresses, not names: `jellyseerr` and `openwebui`
+  # are kept as keys because changing a key destroys and recreates the provider,
+  # the application and its policy bindings - a window in which nothing gated can
+  # authenticate - for a cosmetic gain. `name` and `external_host` are what users
+  # actually see.
+  #
+  # Seerr keeps its own login behind the gate: no stable release supports OIDC or
+  # forward-auth, so the gate is a perimeter control, not single sign-on.
   applications = {
     jellyseerr = {
-      name          = "Jellyseerr"
+      name          = "Seerr"
       slug          = "jellyseerr"
-      external_host = "https://jellyseerr.${local.common_inputs.domain}"
+      external_host = "https://seerr.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
     openwebui = {
       name          = "Open WebUI"
       slug          = "openwebui"
-      external_host = "https://openwebui.${local.common_inputs.domain}"
+      external_host = "https://chat.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
     copyparty = {
@@ -54,7 +60,8 @@ inputs = {
     }
     # YouTube URL -> English transcript. The route and its ReferenceGrant live in
     # homelab-cluster (manifests/cluster/transcript); this entry is the identity
-    # side. No tunnel route: the host is LAN-only, like copyparty.
+    # side. No proxied DNS record: the hostname resolves through the wildcard and
+    # is LAN-only, so remote browsers cannot reach it.
     transcript = {
       name          = "Transcript"
       slug          = "transcript"

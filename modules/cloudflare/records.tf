@@ -1,11 +1,16 @@
-resource "cloudflare_dns_record" "chat" {
-  zone_id = cloudflare_zone.cowlab.id
-  name    = "chat.cowlab.org"
-  type    = "A"
-  content = var.homelab_ip
-  ttl     = 1
-}
-
+# DNS records for cowlab.org.
+#
+# Three shapes, and the shape decides whether a record is needed at all:
+#
+#   * in-cluster, LAN only   -> nothing here. The *.cowlab.org wildcard below
+#                               already points at the load balancer, and Traefik
+#                               routes the hostname.
+#   * in-cluster, remote     -> a proxied CNAME to the tunnel, so Cloudflare
+#                               carries the traffic and cloudflared dials Traefik.
+#                               The tunnel itself has one wildcard ingress rule
+#                               (see tunnel.tf), so this record is the only
+#                               per-host thing left.
+#   * outside the cluster    -> a plain A record to var.homelab_ip.
 resource "cloudflare_dns_record" "npm" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "npm.cowlab.org"
@@ -53,8 +58,11 @@ resource "cloudflare_dns_record" "lb_wildcard" {
 # tunnel only receives traffic for proxied records, and an unproxied CNAME would
 # point browsers at cfargotunnel.com directly.
 #
-# Keep these in step with the ingress list in tunnel.tf. A record without a
-# matching ingress rule resolves to the tunnel and then gets the 404 catch-all.
+# A record here no longer needs a matching rule in tunnel.tf: that file holds one
+# wildcard ingress rule, so the record is the whole per-host change. This is the
+# layer external-dns will own next; until it does, adding a remotely reachable
+# service means adding one of these blocks.
+
 resource "cloudflare_dns_record" "tunnel_authentik" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "authentik.${var.domain}"
@@ -64,6 +72,9 @@ resource "cloudflare_dns_record" "tunnel_authentik" {
   ttl     = 1
 }
 
+# Transition alias: kept so that bookmarks to the pre-rename hostname still work
+# remotely, where the cluster's 301 can only be reached through the tunnel.
+# Delete alongside the matching `httproute-legacy-host.yaml` in the cluster repo.
 resource "cloudflare_dns_record" "tunnel_jellyseerr" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "jellyseerr.${var.domain}"
@@ -73,9 +84,43 @@ resource "cloudflare_dns_record" "tunnel_jellyseerr" {
   ttl     = 1
 }
 
+resource "cloudflare_dns_record" "tunnel_seerr" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "seerr.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+# Transition alias: see tunnel_jellyseerr.
 resource "cloudflare_dns_record" "tunnel_openwebui" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "openwebui.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+# chat.cowlab.org used to be an A record to var.homelab_ip, where Nginx Proxy
+# Manager answered with its "Default Site" and had no certificate for the name
+# (hence `tlsv1 unrecognized name` on 443). It now belongs to the cluster's chat
+# UI, so it becomes a tunnel hostname like the rest.
+resource "cloudflare_dns_record" "tunnel_chat" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "chat.${var.domain}"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+# The identity provider has to be reachable remotely: a remote browser is sent
+# here by the forward-auth outpost before it can reach any gated application.
+resource "cloudflare_dns_record" "tunnel_auth" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "auth.${var.domain}"
   type    = "CNAME"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.homelab.id}.cfargotunnel.com"
   proxied = true

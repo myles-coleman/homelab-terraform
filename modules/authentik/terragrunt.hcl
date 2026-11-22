@@ -52,6 +52,15 @@ inputs = {
       external_host = "https://copyparty.${local.common_inputs.domain}"
       groups        = ["homelab"]
     }
+    # YouTube URL -> English transcript. The route and its ReferenceGrant live in
+    # homelab-cluster (manifests/cluster/transcript); this entry is the identity
+    # side. No tunnel route: the host is LAN-only, like copyparty.
+    transcript = {
+      name          = "Transcript"
+      slug          = "transcript"
+      external_host = "https://transcript.${local.common_inputs.domain}"
+      groups        = ["homelab"]
+    }
   }
 }
 

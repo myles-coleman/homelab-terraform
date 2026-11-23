@@ -65,7 +65,7 @@ jobs:
       matrix: ${{ steps.units.outputs.matrix }}
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       # `plan_role` is the unit's plan role name without the `terraform-plan-`
       # family prefix: the unit path with `/` flattened to `-`, which is the
@@ -100,12 +100,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       # `tofu` only: this job must not drag Terragrunt in, because bootstrap/ has
       # no terragrunt.hcl to run.
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        uses: opentofu/setup-opentofu@v2.0.2
         with:
           tofu_version: ${{ env.tofu_version }}
           tofu_wrapper: false
@@ -148,10 +148,10 @@ jobs:
       TF_CLI_ARGS_init: "-backend=false"
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       - name: Install Terragrunt and OpenTofu
-        uses: gruntwork-io/terragrunt-action@5e86476ca61eaf74adb9c0525745f29f921f2199 # v3.1.0
+        uses: gruntwork-io/terragrunt-action@v3.1.0
         with:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
@@ -223,10 +223,10 @@ jobs:
       NEEDS_TAILNET: ${{ !contains(fromJSON('["cloudflare","s3-backups","tailscale"]'), matrix.module) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 #v5.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
           # One plan role per unit: the S3 prefix a role may read is baked into
           # the role (bootstrap/oidc.tf), so the matrix entry selects the identity
@@ -237,7 +237,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install Terragrunt and OpenTofu
-        uses: gruntwork-io/terragrunt-action@5e86476ca61eaf74adb9c0525745f29f921f2199 # v3.1.0
+        uses: gruntwork-io/terragrunt-action@v3.1.0
         with:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
@@ -256,7 +256,7 @@ jobs:
       # `modules/tailscale/tailnet.hujson`.
       - name: Tailscale
         if: env.NEEDS_TAILNET == 'true'
-        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        uses: tailscale/github-action@v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_PLAN_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_PLAN_OAUTH_SECRET }}
@@ -338,7 +338,7 @@ jobs:
 
       - name: Render Plan Changes
         id: plan-comment
-        uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
+        uses: liatrio/terraform-change-pr-commenter@v1.14.0
         with:
           json-file: ./modules/${{ matrix.module }}/tfplan.json
           comment-header: "Terraform Plan for ${{ matrix.module }}"
@@ -400,17 +400,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 #v5.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
           # Same family prefix as the unit roles; bootstrap is just another leaf.
           role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}-bootstrap
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install OpenTofu
-        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        uses: opentofu/setup-opentofu@v2.0.2
         with:
           tofu_version: ${{ env.tofu_version }}
           tofu_wrapper: false
@@ -450,7 +450,7 @@ jobs:
 
       - name: Render Plan Changes
         id: plan-comment
-        uses: liatrio/terraform-change-pr-commenter@0050454ca62e2839dc35022bfbd474a139c2c65d #v1.14.0
+        uses: liatrio/terraform-change-pr-commenter@v1.14.0
         with:
           json-file: ./bootstrap/tfplan.json
           comment-header: "Terraform Plan for bootstrap"
@@ -520,16 +520,16 @@ jobs:
       TAILSCALE_OAUTH_CLIENT_SECRET: ${{ secrets.TS_TF_OAUTH_SECRET }}
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 #v5.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install Terragrunt and OpenTofu
-        uses: gruntwork-io/terragrunt-action@5e86476ca61eaf74adb9c0525745f29f921f2199 # v3.1.0
+        uses: gruntwork-io/terragrunt-action@v3.1.0
         with:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
@@ -540,7 +540,7 @@ jobs:
       # the kubeconfig dials the kube-vip IP 10.0.0.200:6443 and every other name
       # is public *.cowlab.org resolved over the route.
       - name: Tailscale
-        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        uses: tailscale/github-action@v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -587,7 +587,7 @@ jobs:
           [ -z "${SIGNOZ_ENDPOINT:-}" ] || getent hosts "${SIGNOZ_ENDPOINT#https://}"
 
       - name: Terragrunt Apply
-        uses: gruntwork-io/terragrunt-action@95fc057922e3c3d4cc021a81a213f088f333ddef # v3.0.2
+        uses: gruntwork-io/terragrunt-action@v3.0.2
         with:
           tg_version: ${{ env.tg_version }}
           tofu_version: ${{ env.tofu_version }}
@@ -606,14 +606,14 @@ jobs:
       SIGNOZ_ACCESS_TOKEN: ${{ secrets.SIGNOZ_ACCESS_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       # Same Tailscale and DNS setup as the plan/apply jobs; see the comments
       # there for why --accept-dns=false and the replaced /etc/resolv.conf matter.
       # The wildcard *.cowlab.org record still resolves to the MetalLB IP, which
       # is routed over Tailscale.
       - name: Tailscale
-        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        uses: tailscale/github-action@v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}

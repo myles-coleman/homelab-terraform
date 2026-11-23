@@ -5,7 +5,7 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/deploy.yaml':
         - 'actions/checkout@v6.0.1'
-        - 'aws-actions/configure-aws-credentials@v5.1.0'
+        - 'aws-actions/configure-aws-credentials@v5.1.1'
         - 'gruntwork-io/terragrunt-action@v3.0.2'
         - 'gruntwork-io/terragrunt-action@v3.1.0'
         - 'liatrio/terraform-change-pr-commenter@v1.14.0'
@@ -40,9 +40,9 @@ dependencies:
         commit: 'sha1-949feb2413d6458794dcd2491c4babbbce0c15c1'
         owner_id: 44036562
         repo_id: 189476904
-    'aws-actions/configure-aws-credentials@v5.1.0':
-        ref: 'v5.1.0'
-        commit: 'sha1-00943011d9042930efac3dcd3a170e4273319bc8'
+    'aws-actions/configure-aws-credentials@v5.1.1':
+        ref: 'v5.1.1'
+        commit: 'sha1-61815dcd50bd041e203e49132bacad1fd04d2708'
         owner_id: 57468012
         repo_id: 220391287
     'gruntwork-io/terragrunt-action@v3.0.2':

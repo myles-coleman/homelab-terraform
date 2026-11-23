@@ -17,12 +17,19 @@
 			"src":    ["group:admin"],
 			"dst":    ["*:*"],
 		},
-		// 2. Allow admins to access the local home subnet via the Subnet Router
-		// This allows you to reach 192.168.x.x devices without using the Exit Node
+		// 2. Allow admins to reach every LAN segment through the Subnet Router,
+		// without using the Exit Node. Spec 29 replaced the flat 10.0.0.0/24 LAN
+		// with four segments; the management subnet (192.168.200.0/24) is never
+		// advertised and is deliberately absent here.
 		{
 			"action": "accept",
 			"src":    ["group:admin"],
-			"dst":    ["10.0.0.0/24:*"],
+			"dst": [
+				"10.0.0.0/24:*",  // homelab (estate switch, k3s, PiKVM)
+				"10.20.0.0/24:*", // gaming
+				"10.30.0.0/24:*", // ai
+				"10.50.0.0/24:*", // wifi
+			],
 		},
 		// 3. Allow CI runner to access the k3s nodes
 		{
@@ -118,7 +125,34 @@
 		{
 			"src":    "tag:media-egress",
 			"accept": ["100.112.185.27:53"],
-			"deny":   ["100.112.185.27:22"],
+			"deny":   ["100.112.185.27:22", "10.0.0.150:22", "10.30.0.10:8080"],
+		},
+		// Spec 29: an admin reaches a host in every segment. The management
+		// subnet (192.168.200.0/24) is deliberately not asserted here: rule 1
+		// already grants admins "*:*", so an ACL test could not deny it.
+		// Management stays unreachable because the Vault never advertises that
+		// prefix and its firewall drops every non-enp6s0 packet to it.
+		{
+			"src":    "group:admin",
+			"accept": [
+				"10.0.0.150:22", // homelab
+				"10.20.0.10:22", // gaming (myles-pc)
+				"10.30.0.10:22", // ai (bee-gpu-server)
+				"10.50.0.1:22",  // wifi gateway
+			],
+		},
+		// Spec 29: least privilege for the tagged fleet. CI keeps its explicit
+		// k3s/ingress grants and gets nothing on the gaming/AI/wifi segments.
+		{
+			"src":    "tag:ci",
+			"accept": ["10.0.0.140:22"],
+			"deny":   ["10.20.0.10:22", "10.30.0.10:22", "10.50.0.1:22"],
+		},
+		// The k3s nodes are on the homelab segment itself and need no tailnet
+		// LAN grant (task 4.3): everything LAN-side is denied.
+		{
+			"src":  "tag:server",
+			"deny": ["10.0.0.150:22", "10.20.0.10:22", "10.30.0.10:22", "10.50.0.1:22"],
 		},
 	],
 	"autoApprovers": {

@@ -1,0 +1,45 @@
+name: verify-lockfile
+
+# The lockfile at .github/workflows/actions.lock is what pins every action (and
+# every action those actions use) to a commit. A workflow that adds or changes a
+# `uses:` without re-running `gh actions-lock` leaves that dependency unpinned,
+# so this gate fails the pull request instead of letting the omission land.
+#
+# `--verify` re-resolves every reference against upstream and writes nothing: it
+# is the same set of checks as a fix run, which is why this job needs network
+# access to the GitHub API but no write permission.
+#
+# Adapted from github/gh-actions-lock's .github/workflows/verify-lockfile.yml.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify actions.lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Enough to read public action metadata; the extension never writes.
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          # Nothing here pushes, so the job token must not sit in .git/config.
+          persist-credentials: false
+
+      # Pinned to an exact release: the verifier decides whether the lockfile is
+      # current, so it must not itself move under us. Renovate bumps this tag and
+      # the lockfile entry in the same pull request.
+      - name: Install gh-actions-lock
+        run: gh extension install github/gh-actions-lock --pin v0.5.1
+
+      - name: Verify the lockfile is current
+        run: gh actions-lock --verify

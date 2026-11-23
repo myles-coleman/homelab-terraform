@@ -20,6 +20,8 @@ modules/tailscale/             # tailnet policy file + CI OAuth clients (has its
 scripts/                       # signoz-dashboard-smoke.sh
 .github/workflows/deploy.yaml  # format, validate on PR, plan on push, apply on main
 .github/workflows/secrets.yaml # gitleaks gate over the full history
+.github/workflows/actions.lock # generated: pins every action the workflows use
+.github/workflows/verify-lockfile.yml # fails CI when the lockfile is stale
 ```
 
 Each directory under `modules/` is its own unit with its own state key
@@ -106,6 +108,25 @@ variables they need.
   `terraform-*` roles and policies and writes only that state's lock. It holds no unit
   credentials and no tailnet node. Applying `bootstrap/` is still a hand-run step.
 
+## Workflow Dependency Lockfile
+
+`uses:` references stay readable — `actions/checkout@v6.0.2`, not a 40-character SHA.
+`.github/workflows/actions.lock` pins each of those references to a verified commit, including
+the actions that a composite action calls itself, and records the source repository's numeric
+identity next to it. It replaces pinning by hand inside the workflow files: for a workflow the
+lockfile covers, the lockfile is the pin, and it also covers what inline SHA pinning could not.
+
+- After adding or changing any `uses:`, run `gh actions-lock` from the repository root and
+  commit the regenerated lockfile with the change. `.github/workflows/verify-lockfile.yml` runs
+  `gh actions-lock --verify` on every pull request, so an un-locked reference fails CI.
+- Never edit `actions.lock` by hand. It is machine-generated, and the next run overwrites it.
+- Keep tags in workflows, not SHAs. A SHA written into a `uses:` is locked as a SHA, so it adds
+  nothing over the lockfile entry and makes the workflow harder to read.
+- Renovate regenerates the lockfile in the same pull request as an action bump; an actions PR
+  should therefore change two files, the workflow and `actions.lock`. Renovate marks lockfile
+  support as experimental, so check that second file when reviewing.
+- The extension is pinned in `verify-lockfile.yml`, and Renovate bumps that tag with the rest.
+
 ## Boundaries
 
 ### Always
@@ -147,6 +168,8 @@ variables they need.
 
 ### Never
 
+- Never edit `.github/workflows/actions.lock` by hand, and never leave a `uses:` change
+  unaccompanied by the lockfile update `gh actions-lock` produces.
 - Never hand-edit `_backend.tf` or `_provider.tf`. Terragrunt regenerates them, so the edit is
   silently lost.
 - Never commit a `.tfstate`, a `tfplan.tfplan`, a `.terraform/` directory, or a generated

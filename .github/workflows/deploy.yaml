@@ -338,7 +338,7 @@ jobs:
 
       - name: Render Plan Changes
         id: plan-comment
-        uses: liatrio/terraform-change-pr-commenter@v1.14.0
+        uses: liatrio/terraform-change-pr-commenter@v1.14.2
         with:
           json-file: ./modules/${{ matrix.module }}/tfplan.json
           comment-header: "Terraform Plan for ${{ matrix.module }}"
@@ -450,7 +450,7 @@ jobs:
 
       - name: Render Plan Changes
         id: plan-comment
-        uses: liatrio/terraform-change-pr-commenter@v1.14.0
+        uses: liatrio/terraform-change-pr-commenter@v1.14.2
         with:
           json-file: ./bootstrap/tfplan.json
           comment-header: "Terraform Plan for bootstrap"

@@ -43,6 +43,25 @@ resource "cloudflare_dns_record" "vaultwarden" {
   ttl     = 1
 }
 
+# The transcriber on bee-gpu-server.
+#
+# A plain A record to the host's tailnet address rather than the wildcard's
+# load-balancer address: the service binds to its tailscale interface only, and
+# the host has no LAN address at all. The wildcard would resolve here for LAN
+# clients and 404 — this resolves to an address those clients cannot route,
+# which is the intended answer. Tailnet clients reach it directly; there is no
+# tunnel record, because it should not be on the public internet.
+#
+# TLS is not available for this name: Tailscale issues certificates only for
+# *.ts.net, and Cloudflare cannot proxy a CGNAT origin. Use http://.
+resource "cloudflare_dns_record" "transcript" {
+  zone_id = cloudflare_zone.cowlab.id
+  name    = "transcript.cowlab.org"
+  type    = "A"
+  content = var.gpu_ip
+  ttl     = 1
+}
+
 resource "cloudflare_dns_record" "lb_wildcard" {
   zone_id = cloudflare_zone.cowlab.id
   name    = "*.cowlab.org"

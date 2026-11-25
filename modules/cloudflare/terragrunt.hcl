@@ -10,11 +10,13 @@ locals {
 }
 
 inputs = {
-  domain                     = local.common_inputs.domain
-  cloudflare_account_id      = "2d5355a5b98f357a3fb2faf0c1bfc397"
-  cloudflare_zone_id         = "69f233ea91536ada17282a49b70420cf"
-  lb_ip                      = "10.0.0.99"
-  homelab_ip                 = "10.0.0.150"
+  domain                = local.common_inputs.domain
+  cloudflare_account_id = "2d5355a5b98f357a3fb2faf0c1bfc397"
+  cloudflare_zone_id    = "69f233ea91536ada17282a49b70420cf"
+  lb_ip                 = "10.0.0.99"
+  homelab_ip            = "10.0.0.150"
+  # bee-gpu-server's only address. The LAN has no route to it; tailnet clients do.
+  gpu_ip                     = "100.127.170.8"
   google_oauth_client_id     = local.google_oauth_client_id
   google_oauth_client_secret = local.google_oauth_client_secret
   allowed_emails             = local.allowed_emails

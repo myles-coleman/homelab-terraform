@@ -24,6 +24,11 @@ variable "homelab_ip" {
   type        = string
 }
 
+variable "gpu_ip" {
+  description = "The tailnet address of bee-gpu-server, which has no LAN address. Records pointing at it are reachable from tailnet clients only."
+  type        = string
+}
+
 variable "google_oauth_client_id" {
   description = "Google OAuth Client ID for Cloudflare Access"
   type        = string
